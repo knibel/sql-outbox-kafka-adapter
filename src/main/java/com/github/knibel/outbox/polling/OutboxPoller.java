@@ -1,5 +1,6 @@
 package com.github.knibel.outbox.polling;
 
+import com.github.knibel.outbox.config.AcknowledgementStrategy;
 import com.github.knibel.outbox.config.OutboxTableProperties;
 import com.github.knibel.outbox.domain.OutboxRecord;
 import com.github.knibel.outbox.jdbc.OutboxRepository;
@@ -18,7 +19,9 @@ import org.slf4j.LoggerFactory;
  *   <li><b>Claim</b> – select a batch of pending rows with
  *       {@code FOR UPDATE SKIP LOCKED}.
  *   <li><b>Publish</b> – send each row to Kafka and flush.
- *   <li><b>Mark done</b> – update all rows in the batch to the done value.
+ *   <li><b>Acknowledge</b> – apply the configured
+ *       {@link AcknowledgementStrategy}: update a status column, delete the
+ *       rows, or write a processed-at timestamp.
  * </ol>
  *
  * <p>Any exception from any step is propagated to the caller
@@ -37,7 +40,7 @@ public class OutboxPoller {
     private final OutboxRepository repository;
     private final OutboxKafkaProducer kafkaProducer;
     private final Counter claimedCounter;
-    private final Counter doneCounter;
+    private final Counter processedCounter;
 
     OutboxPoller(OutboxTableProperties config,
                  OutboxRepository repository,
@@ -52,7 +55,7 @@ public class OutboxPoller {
                 .description("Number of outbox rows claimed for processing")
                 .tag("table", table)
                 .register(meterRegistry);
-        this.doneCounter = Counter.builder("outbox.rows.done")
+        this.processedCounter = Counter.builder("outbox.rows.processed")
                 .description("Number of outbox rows successfully published to Kafka")
                 .tag("table", table)
                 .register(meterRegistry);
@@ -77,9 +80,21 @@ public class OutboxPoller {
 
         List<String> ids = records.stream().map(OutboxRecord::id).toList();
         kafkaProducer.sendBatch(records);
-        repository.markDone(config, ids);
-        doneCounter.increment(ids.size());
-        log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
+        switch (config.getAcknowledgementStrategy()) {
+            case DELETE -> {
+                repository.deleteByIds(config, ids);
+                log.debug("Deleted {} row(s) from table '{}'", ids.size(), config.getTableName());
+            }
+            case TIMESTAMP -> {
+                repository.markProcessedAt(config, ids);
+                log.debug("Timestamped {} row(s) in table '{}'", ids.size(), config.getTableName());
+            }
+            default -> {
+                repository.markDone(config, ids);
+                log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
+            }
+        }
+        processedCounter.increment(ids.size());
     }
 
     OutboxTableProperties getConfig() {
