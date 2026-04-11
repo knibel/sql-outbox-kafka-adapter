@@ -2,6 +2,7 @@ package com.github.knibel.outbox.jdbc;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.knibel.outbox.config.AcknowledgementStrategy;
 import com.github.knibel.outbox.config.OutboxTableProperties;
 import com.github.knibel.outbox.domain.OutboxRecord;
 import java.util.ArrayList;
@@ -55,24 +56,56 @@ public class OutboxRepository {
      * using {@code FOR UPDATE SKIP LOCKED} to prevent concurrent instances from
      * claiming the same rows.
      *
+     * <p>The definition of "pending" depends on the configured
+     * {@link AcknowledgementStrategy}:
+     * <ul>
+     *   <li>{@code STATUS} – rows where {@code statusColumn = pendingValue}.
+     *   <li>{@code DELETE} – all rows present in the table.
+     *   <li>{@code TIMESTAMP} – rows where {@code processedAtColumn IS NULL}.
+     * </ul>
+     *
      * @return the pending rows mapped to {@link OutboxRecord}s; empty if none.
      */
     @Transactional
     public List<OutboxRecord> claimBatch(OutboxTableProperties config) {
-        String table     = SqlIdentifier.quote(config.getTableName());
-        String idCol     = SqlIdentifier.quote(config.getIdColumn());
-        String statusCol = SqlIdentifier.quote(config.getStatusColumn());
+        String table      = SqlIdentifier.quote(config.getTableName());
+        String idCol      = SqlIdentifier.quote(config.getIdColumn());
         String selectList = buildSelectList(config);
 
-        String sql = "SELECT " + selectList
-                + " FROM " + table
-                + " WHERE " + statusCol + " = ?"
-                + " ORDER BY " + idCol
-                + " LIMIT ?"
-                + " FOR UPDATE SKIP LOCKED";
+        AcknowledgementStrategy strategy = config.getAcknowledgementStrategy();
 
-        return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
-                config.getPendingValue(), config.getBatchSize());
+        if (strategy == AcknowledgementStrategy.STATUS) {
+            String statusCol = SqlIdentifier.quote(config.getStatusColumn());
+            String sql = "SELECT " + selectList
+                    + " FROM " + table
+                    + " WHERE " + statusCol + " = ?"
+                    + " ORDER BY " + idCol
+                    + " LIMIT ?"
+                    + " FOR UPDATE SKIP LOCKED";
+            return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
+                    config.getPendingValue(), config.getBatchSize());
+
+        } else if (strategy == AcknowledgementStrategy.TIMESTAMP) {
+            String processedAtCol = SqlIdentifier.quote(config.getProcessedAtColumn());
+            String sql = "SELECT " + selectList
+                    + " FROM " + table
+                    + " WHERE " + processedAtCol + " IS NULL"
+                    + " ORDER BY " + idCol
+                    + " LIMIT ?"
+                    + " FOR UPDATE SKIP LOCKED";
+            return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
+                    config.getBatchSize());
+
+        } else {
+            // DELETE strategy: every row present is pending
+            String sql = "SELECT " + selectList
+                    + " FROM " + table
+                    + " ORDER BY " + idCol
+                    + " LIMIT ?"
+                    + " FOR UPDATE SKIP LOCKED";
+            return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
+                    config.getBatchSize());
+        }
     }
 
     /**
@@ -108,6 +141,28 @@ public class OutboxRepository {
         String idCol = SqlIdentifier.quote(config.getIdColumn());
 
         String sql = "DELETE FROM " + table
+                + " WHERE " + idCol + " IN (:ids)";
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("ids", ids);
+
+        namedJdbc.update(sql, params);
+    }
+
+    /**
+     * Records the current timestamp in {@code processedAtColumn} for all given
+     * rows (successfully published to Kafka).
+     */
+    @Transactional
+    public void markProcessedAt(OutboxTableProperties config, List<String> ids) {
+        if (ids.isEmpty()) return;
+
+        String table          = SqlIdentifier.quote(config.getTableName());
+        String idCol          = SqlIdentifier.quote(config.getIdColumn());
+        String processedAtCol = SqlIdentifier.quote(config.getProcessedAtColumn());
+
+        String sql = "UPDATE " + table
+                + " SET " + processedAtCol + " = NOW()"
                 + " WHERE " + idCol + " IN (:ids)";
 
         MapSqlParameterSource params = new MapSqlParameterSource()

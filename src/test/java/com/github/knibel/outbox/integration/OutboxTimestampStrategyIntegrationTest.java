@@ -39,13 +39,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration test verifying the {@code DELETE} acknowledgement strategy.
+ * Integration test verifying the {@code TIMESTAMP} acknowledgement strategy.
  *
  * <ol>
- *   <li>Rows are inserted into the outbox table.
- *   <li>The poller picks them up, publishes to Kafka, and <em>deletes</em> them.
+ *   <li>Rows are inserted into the outbox table with {@code processed_at = NULL}.
+ *   <li>The poller picks them up, publishes to Kafka, and writes {@code NOW()}
+ *       into the {@code processed_at} column.
  *   <li>A test Kafka consumer confirms the expected messages arrived.
- *   <li>The database rows are verified to no longer exist.
+ *   <li>The database rows are verified to have a non-null {@code processed_at}.
  * </ol>
  */
 @SpringBootTest(
@@ -56,14 +57,15 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].keyColumn=aggregate_id",
                 "outbox.tables[0].payloadColumn=payload",
                 "outbox.tables[0].headersColumn=headers_json",
-                "outbox.tables[0].staticTopic=delete-strategy-topic",
-                "outbox.tables[0].acknowledgementStrategy=DELETE",
+                "outbox.tables[0].staticTopic=timestamp-strategy-topic",
+                "outbox.tables[0].acknowledgementStrategy=TIMESTAMP",
+                "outbox.tables[0].processedAtColumn=processed_at",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
         }
 )
 @Testcontainers
-class OutboxDeleteStrategyIntegrationTest {
+class OutboxTimestampStrategyIntegrationTest {
 
     // ── Containers ─────────────────────────────────────────────────────────
 
@@ -95,7 +97,7 @@ class OutboxDeleteStrategyIntegrationTest {
         Properties adminProps = new Properties();
         adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         try (AdminClient admin = AdminClient.create(adminProps)) {
-            admin.createTopics(List.of(new NewTopic("delete-strategy-topic", 1, (short) 1)))
+            admin.createTopics(List.of(new NewTopic("timestamp-strategy-topic", 1, (short) 1)))
                     .all()
                     .get(10, TimeUnit.SECONDS);
         }
@@ -116,7 +118,7 @@ class OutboxDeleteStrategyIntegrationTest {
         jdbcTemplate.execute("TRUNCATE TABLE test_outbox");
 
         consumer = createConsumer(kafka.getBootstrapServers());
-        consumer.subscribe(Collections.singletonList("delete-strategy-topic"));
+        consumer.subscribe(Collections.singletonList("timestamp-strategy-topic"));
         consumer.poll(Duration.ofMillis(500));
     }
 
@@ -128,20 +130,28 @@ class OutboxDeleteStrategyIntegrationTest {
     // ── Tests ───────────────────────────────────────────────────────────────
 
     @Test
-    void shouldPublishToKafkaAndDeleteRows() {
+    void shouldPublishToKafkaAndWriteProcessedAtTimestamp() {
         int rowCount = 5;
-        List<String> ids = insertPendingRows(rowCount);
+        List<String> ids = insertRows(rowCount);
 
-        // Wait until all rows are deleted from the database.
+        // Wait until all rows have a non-null processed_at.
         await().atMost(Duration.ofSeconds(15))
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
-                    int remaining = namedJdbc.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox WHERE id IN (:ids)",
+                    int processedCount = namedJdbc.queryForObject(
+                            "SELECT COUNT(*) FROM test_outbox"
+                            + " WHERE id IN (:ids) AND processed_at IS NOT NULL",
                             new MapSqlParameterSource("ids", ids),
                             Integer.class);
-                    assertThat(remaining).isZero();
+                    assertThat(processedCount).isEqualTo(rowCount);
                 });
+
+        // Rows should still exist in the table.
+        int remaining = namedJdbc.queryForObject(
+                "SELECT COUNT(*) FROM test_outbox WHERE id IN (:ids)",
+                new MapSqlParameterSource("ids", ids),
+                Integer.class);
+        assertThat(remaining).isEqualTo(rowCount);
 
         // Verify the corresponding Kafka messages arrived.
         List<ConsumerRecord<String, String>> received = pollAllMessages(rowCount);
@@ -156,18 +166,18 @@ class OutboxDeleteStrategyIntegrationTest {
     }
 
     @Test
-    void shouldDeleteLargeBatchInMultipleCycles() {
+    void shouldTimestampLargeBatchInMultipleCycles() {
         // Insert more rows than batchSize (10) to exercise multiple poll cycles.
         int rowCount = 25;
-        insertPendingRows(rowCount);
+        insertRows(rowCount);
 
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofMillis(300))
                 .untilAsserted(() -> {
-                    int remaining = jdbcTemplate.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox",
+                    int processedCount = jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM test_outbox WHERE processed_at IS NOT NULL",
                             Integer.class);
-                    assertThat(remaining).isZero();
+                    assertThat(processedCount).isEqualTo(rowCount);
                 });
 
         List<ConsumerRecord<String, String>> received = pollAllMessages(rowCount);
@@ -176,13 +186,11 @@ class OutboxDeleteStrategyIntegrationTest {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private List<String> insertPendingRows(int count) {
+    private List<String> insertRows(int count) {
         List<String> ids = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             String id = UUID.randomUUID().toString();
             ids.add(id);
-            // The DELETE strategy does not filter on status; we rely on the
-            // schema default for the NOT NULL status column.
             jdbcTemplate.update(
                     "INSERT INTO test_outbox (id, aggregate_id, payload, headers_json) "
                     + "VALUES (?, ?, ?, ?)",
@@ -207,7 +215,7 @@ class OutboxDeleteStrategyIntegrationTest {
     private static KafkaConsumer<String, String> createConsumer(String bootstrapServers) {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "outbox-delete-test-consumer-" + UUID.randomUUID());
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "outbox-timestamp-test-consumer-" + UUID.randomUUID());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

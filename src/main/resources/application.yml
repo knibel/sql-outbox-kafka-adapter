@@ -62,7 +62,8 @@ outbox:
   # One entry per outbox table. Multiple tables are polled concurrently,
   # each in its own virtual thread.
   #
-  # Each row moves from pendingValue → doneValue in the statusColumn.
+  # After publishing each row is acknowledged according to the configured
+  # acknowledgementStrategy (STATUS / DELETE / TIMESTAMP).
   # Any error during a poll cycle shuts the application down immediately
   # to preserve message ordering.
   tables:
@@ -102,7 +103,14 @@ outbox:
       # Required if topicColumn is not set.
       staticTopic: orders
 
-      # ── Status tracking ─────────────────────────────────────────────────────
+      # ── Acknowledgement strategy ───────────────────────────────────────────
+      # How rows are acknowledged after being successfully published to Kafka.
+      # Allowed values: STATUS (default), DELETE, TIMESTAMP.
+      acknowledgementStrategy: STATUS
+
+      # ── STATUS strategy settings ───────────────────────────────────────────
+      # Required only when acknowledgementStrategy: STATUS.
+
       # Column that tracks processing status. Default: "status".
       statusColumn: status
 
@@ -110,10 +118,11 @@ outbox:
       pendingValue: PENDING
 
       # Value that means "successfully published to Kafka". Default: "DONE".
-      # Ignored when deleteAfterPublish is true.
       doneValue: DONE
 
-      # When true, rows are deleted from the table after being successfully
-      # published to Kafka instead of being updated to doneValue.
-      # Default: false.
-      deleteAfterPublish: false
+      # ── TIMESTAMP strategy settings ────────────────────────────────────────
+      # Required only when acknowledgementStrategy: TIMESTAMP.
+
+      # Column into which NOW() is written after a row is published.
+      # Rows with NULL in this column are treated as pending.
+      # processedAtColumn: processed_at

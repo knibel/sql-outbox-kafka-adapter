@@ -3,9 +3,15 @@ package com.github.knibel.outbox.config;
 /**
  * Configuration for a single outbox table.
  *
- * <p>Each row transitions from {@code pendingValue} to {@code doneValue} in
- * the {@code statusColumn}.  If any error occurs during publishing the
- * application shuts down to preserve record ordering.
+ * <p>After a row is successfully published to Kafka the adapter acknowledges
+ * it according to the configured {@link AcknowledgementStrategy}:
+ * <ul>
+ *   <li>{@link AcknowledgementStrategy#STATUS STATUS} (default) – updates
+ *       {@code statusColumn} from {@code pendingValue} to {@code doneValue}.
+ *   <li>{@link AcknowledgementStrategy#DELETE DELETE} – deletes the row.
+ *   <li>{@link AcknowledgementStrategy#TIMESTAMP TIMESTAMP} – writes
+ *       {@code NOW()} into {@code processedAtColumn}.
+ * </ul>
  *
  * <p><b>Topic routing</b>
  * <ul>
@@ -60,30 +66,41 @@ public class OutboxTableProperties {
     /** Static Kafka topic used when {@code topicColumn} is not set. */
     private String staticTopic;
 
-    // ── Status / marking ─────────────────────────────────────────────────────
+    // ── Acknowledgement strategy ─────────────────────────────────────────────
 
-    /** Column that tracks processing status. Required. */
+    /**
+     * How to acknowledge a row after it has been successfully published.
+     * Default: {@link AcknowledgementStrategy#STATUS}.
+     */
+    private AcknowledgementStrategy acknowledgementStrategy = AcknowledgementStrategy.STATUS;
+
+    // ── Status strategy settings ─────────────────────────────────────────────
+    // Used only when acknowledgementStrategy = STATUS.
+
+    /** Column that tracks processing status. Required for STATUS strategy. */
     private String statusColumn = "status";
 
     /**
      * Value in {@code statusColumn} that marks a row as not yet processed.
-     * Default: {@code "PENDING"}.
+     * Default: {@code "PENDING"}.  Used only for STATUS strategy.
      */
     private String pendingValue = "PENDING";
 
     /**
      * Value in {@code statusColumn} that marks a row as successfully processed.
-     * Default: {@code "DONE"}.
-     * Ignored when {@code deleteAfterPublish} is {@code true}.
+     * Default: {@code "DONE"}.  Used only for STATUS strategy.
      */
     private String doneValue = "DONE";
 
+    // ── Timestamp strategy settings ───────────────────────────────────────────
+    // Used only when acknowledgementStrategy = TIMESTAMP.
+
     /**
-     * When {@code true}, rows are deleted from the table after being successfully
-     * published to Kafka instead of being updated to {@code doneValue}.
-     * Default: {@code false}.
+     * Column into which {@code NOW()} is written after a row has been
+     * successfully published.  Rows with a {@code NULL} value are treated as
+     * pending.  Required for TIMESTAMP strategy.
      */
-    private boolean deleteAfterPublish = false;
+    private String processedAtColumn;
 
     // ── Getters / setters ─────────────────────────────────────────────────────
 
@@ -123,6 +140,9 @@ public class OutboxTableProperties {
     public String getDoneValue() { return doneValue; }
     public void setDoneValue(String doneValue) { this.doneValue = doneValue; }
 
-    public boolean isDeleteAfterPublish() { return deleteAfterPublish; }
-    public void setDeleteAfterPublish(boolean deleteAfterPublish) { this.deleteAfterPublish = deleteAfterPublish; }
+    public AcknowledgementStrategy getAcknowledgementStrategy() { return acknowledgementStrategy; }
+    public void setAcknowledgementStrategy(AcknowledgementStrategy acknowledgementStrategy) { this.acknowledgementStrategy = acknowledgementStrategy; }
+
+    public String getProcessedAtColumn() { return processedAtColumn; }
+    public void setProcessedAtColumn(String processedAtColumn) { this.processedAtColumn = processedAtColumn; }
 }
