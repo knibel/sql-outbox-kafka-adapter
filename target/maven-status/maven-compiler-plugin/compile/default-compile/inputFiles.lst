@@ -1,0 +1,8 @@
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/OutboxMessage.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/OutboxPoller.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/OutboxRepository.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/config/OutboxAutoConfiguration.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/config/OutboxProperties.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/strategy/DeleteAfterProcessingStrategy.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/strategy/MarkAsProcessedStrategy.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/main/java/com/knibel/outbox/strategy/OutboxProcessingStrategy.java

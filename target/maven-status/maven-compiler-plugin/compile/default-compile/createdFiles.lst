@@ -1,0 +1,11 @@
+com/knibel/outbox/config/OutboxAutoConfiguration$1.class
+META-INF/spring-configuration-metadata.json
+com/knibel/outbox/strategy/OutboxProcessingStrategy.class
+com/knibel/outbox/config/OutboxAutoConfiguration.class
+com/knibel/outbox/OutboxRepository.class
+com/knibel/outbox/OutboxPoller.class
+com/knibel/outbox/OutboxMessage.class
+com/knibel/outbox/config/OutboxProperties.class
+com/knibel/outbox/config/OutboxProperties$ProcessingStrategy.class
+com/knibel/outbox/strategy/DeleteAfterProcessingStrategy.class
+com/knibel/outbox/strategy/MarkAsProcessedStrategy.class

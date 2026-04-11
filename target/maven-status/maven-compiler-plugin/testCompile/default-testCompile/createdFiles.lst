@@ -1,0 +1,3 @@
+com/knibel/outbox/poller/OutboxPollerTest.class
+com/knibel/outbox/strategy/MarkAsProcessedStrategyTest.class
+com/knibel/outbox/strategy/DeleteAfterProcessingStrategyTest.class

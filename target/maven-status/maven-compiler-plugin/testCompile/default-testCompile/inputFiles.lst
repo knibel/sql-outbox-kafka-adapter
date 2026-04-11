@@ -1,0 +1,3 @@
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/knibel/outbox/poller/OutboxPollerTest.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/knibel/outbox/strategy/DeleteAfterProcessingStrategyTest.java
+/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/knibel/outbox/strategy/MarkAsProcessedStrategyTest.java
