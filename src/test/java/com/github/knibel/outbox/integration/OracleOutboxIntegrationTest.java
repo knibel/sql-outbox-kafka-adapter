@@ -120,7 +120,7 @@ class OracleOutboxIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute("TRUNCATE TABLE test_outbox");
+        jdbcTemplate.execute("TRUNCATE TABLE \"test_outbox\"");
 
         consumer = createConsumer(kafkaBootstrapServers);
         consumer.subscribe(Collections.singletonList("oracle-status-topic"));
@@ -143,7 +143,7 @@ class OracleOutboxIntegrationTest {
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     List<String> statuses = namedJdbc.queryForList(
-                            "SELECT status FROM test_outbox WHERE id IN (:ids)",
+                            "SELECT \"status\" FROM \"test_outbox\" WHERE \"id\" IN (:ids)",
                             new MapSqlParameterSource("ids", ids),
                             String.class);
                     assertThat(statuses)
@@ -171,7 +171,7 @@ class OracleOutboxIntegrationTest {
                 .pollInterval(Duration.ofMillis(300))
                 .untilAsserted(() -> {
                     int doneCount = jdbcTemplate.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox WHERE status = 'DONE'",
+                            "SELECT COUNT(*) FROM \"test_outbox\" WHERE \"status\" = 'DONE'",
                             Integer.class);
                     assertThat(doneCount).isEqualTo(rowCount);
                 });
@@ -188,7 +188,7 @@ class OracleOutboxIntegrationTest {
             String id = UUID.randomUUID().toString();
             ids.add(id);
             jdbcTemplate.update(
-                    "INSERT INTO test_outbox (id, aggregate_id, payload, headers_json, status) "
+                    "INSERT INTO \"test_outbox\" (\"id\", \"aggregate_id\", \"payload\", \"headers_json\", \"status\") "
                     + "VALUES (?, ?, ?, ?, 'PENDING')",
                     id,
                     id,

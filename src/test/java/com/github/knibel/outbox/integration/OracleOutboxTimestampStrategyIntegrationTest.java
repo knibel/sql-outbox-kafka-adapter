@@ -120,7 +120,7 @@ class OracleOutboxTimestampStrategyIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute("TRUNCATE TABLE test_outbox");
+        jdbcTemplate.execute("TRUNCATE TABLE \"test_outbox\"");
 
         consumer = createConsumer(kafkaBootstrapServers);
         consumer.subscribe(Collections.singletonList("oracle-timestamp-topic"));
@@ -143,8 +143,8 @@ class OracleOutboxTimestampStrategyIntegrationTest {
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     int processedCount = namedJdbc.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox"
-                            + " WHERE id IN (:ids) AND processed_at IS NOT NULL",
+                            "SELECT COUNT(*) FROM \"test_outbox\""
+                            + " WHERE \"id\" IN (:ids) AND \"processed_at\" IS NOT NULL",
                             new MapSqlParameterSource("ids", ids),
                             Integer.class);
                     assertThat(processedCount).isEqualTo(rowCount);
@@ -152,7 +152,7 @@ class OracleOutboxTimestampStrategyIntegrationTest {
 
         // Rows should still exist in the table.
         int remaining = namedJdbc.queryForObject(
-                "SELECT COUNT(*) FROM test_outbox WHERE id IN (:ids)",
+                "SELECT COUNT(*) FROM \"test_outbox\" WHERE \"id\" IN (:ids)",
                 new MapSqlParameterSource("ids", ids),
                 Integer.class);
         assertThat(remaining).isEqualTo(rowCount);
@@ -177,7 +177,7 @@ class OracleOutboxTimestampStrategyIntegrationTest {
                 .pollInterval(Duration.ofMillis(300))
                 .untilAsserted(() -> {
                     int processedCount = jdbcTemplate.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox WHERE processed_at IS NOT NULL",
+                            "SELECT COUNT(*) FROM \"test_outbox\" WHERE \"processed_at\" IS NOT NULL",
                             Integer.class);
                     assertThat(processedCount).isEqualTo(rowCount);
                 });
@@ -194,7 +194,7 @@ class OracleOutboxTimestampStrategyIntegrationTest {
             String id = UUID.randomUUID().toString();
             ids.add(id);
             jdbcTemplate.update(
-                    "INSERT INTO test_outbox (id, aggregate_id, payload, headers_json) "
+                    "INSERT INTO \"test_outbox\" (\"id\", \"aggregate_id\", \"payload\", \"headers_json\") "
                     + "VALUES (?, ?, ?, ?)",
                     id,
                     id,
