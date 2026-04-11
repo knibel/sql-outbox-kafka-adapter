@@ -18,7 +18,8 @@ import org.slf4j.LoggerFactory;
  *   <li><b>Claim</b> – select a batch of pending rows with
  *       {@code FOR UPDATE SKIP LOCKED}.
  *   <li><b>Publish</b> – send each row to Kafka and flush.
- *   <li><b>Mark done</b> – update all rows in the batch to the done value.
+ *   <li><b>Post-process</b> – either delete the rows or mark them as done,
+ *       depending on {@link OutboxTableProperties#isDeleteAfterPublish()}.
  * </ol>
  *
  * <p>Any exception from any step is propagated to the caller
@@ -37,7 +38,7 @@ public class OutboxPoller {
     private final OutboxRepository repository;
     private final OutboxKafkaProducer kafkaProducer;
     private final Counter claimedCounter;
-    private final Counter doneCounter;
+    private final Counter processedCounter;
 
     OutboxPoller(OutboxTableProperties config,
                  OutboxRepository repository,
@@ -52,7 +53,7 @@ public class OutboxPoller {
                 .description("Number of outbox rows claimed for processing")
                 .tag("table", table)
                 .register(meterRegistry);
-        this.doneCounter = Counter.builder("outbox.rows.done")
+        this.processedCounter = Counter.builder("outbox.rows.processed")
                 .description("Number of outbox rows successfully published to Kafka")
                 .tag("table", table)
                 .register(meterRegistry);
@@ -79,11 +80,11 @@ public class OutboxPoller {
         kafkaProducer.sendBatch(records);
         if (config.isDeleteAfterPublish()) {
             repository.deleteByIds(config, ids);
-            doneCounter.increment(ids.size());
+            processedCounter.increment(ids.size());
             log.debug("Deleted {} row(s) from table '{}'", ids.size(), config.getTableName());
         } else {
             repository.markDone(config, ids);
-            doneCounter.increment(ids.size());
+            processedCounter.increment(ids.size());
             log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
         }
     }
