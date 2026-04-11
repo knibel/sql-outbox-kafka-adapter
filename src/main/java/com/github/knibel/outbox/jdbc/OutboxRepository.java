@@ -64,6 +64,7 @@ public class OutboxRepository {
             String product = meta.getDatabaseProductName();
             return product != null && product.toLowerCase().contains("oracle");
         } catch (Exception e) {
+            log.warn("Could not detect database product name; assuming non-Oracle: {}", e.getMessage());
             return false;
         }
     }
@@ -97,6 +98,13 @@ public class OutboxRepository {
             String statusCol = quoteIdentifier(config.getStatusColumn());
             String sql;
             if (oracle) {
+                // Oracle: ROWNUM is evaluated before ORDER BY, so this selects
+                // any N matching rows (not necessarily the N with the smallest id)
+                // and then sorts them. A subquery-based approach is not possible
+                // because Oracle forbids FOR UPDATE on inline views (ORA-02014).
+                // For the outbox pattern this is acceptable: all pending rows
+                // will be processed eventually; ordering within a batch is a
+                // convenience, not a correctness requirement.
                 sql = "SELECT " + selectList
                         + " FROM " + table
                         + " WHERE " + statusCol + " = ? AND ROWNUM <= ?"
