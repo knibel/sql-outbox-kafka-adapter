@@ -21,7 +21,7 @@
         <java.version>25</java.version>
         <!-- Keep dependency versions explicit so CVE audits are easy -->
         <kafka-clients.version>3.9.0</kafka-clients.version>
-        <postgresql.version>42.7.5</postgresql.version>
+        <postgresql.version>42.7.7</postgresql.version>
         <testcontainers.version>1.20.6</testcontainers.version>
     </properties>
 
