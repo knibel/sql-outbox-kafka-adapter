@@ -54,10 +54,11 @@ public class EnumStatusStrategy implements StatusStrategy {
         }
         String statusCol = SqlIdentifier.quote(config.getStatusColumn());
         String updatedCol = SqlIdentifier.quote(config.getUpdatedAtColumn());
-        // Row is stuck when it has been IN_PROGRESS for longer than stuckTtlSeconds.
-        // Using (? * INTERVAL '1 second') instead of concatenating the TTL into SQL.
-        String sql = statusCol + " = ? AND " + updatedCol
-                + " < NOW() - (? * INTERVAL '1 second')";
-        return SqlFragment.of(sql, config.getInProgressValue(), config.getStuckTtlSeconds());
+        // Compute the cutoff timestamp in Java so the WHERE clause uses only
+        // standard SQL parameter binding (no vendor-specific INTERVAL syntax).
+        long cutoffMillis = System.currentTimeMillis() - config.getStuckTtlSeconds() * 1_000L;
+        java.sql.Timestamp cutoff = new java.sql.Timestamp(cutoffMillis);
+        String sql = statusCol + " = ? AND " + updatedCol + " < ?";
+        return SqlFragment.of(sql, config.getInProgressValue(), cutoff);
     }
 }

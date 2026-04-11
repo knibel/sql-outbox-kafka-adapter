@@ -31,10 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code FOR UPDATE SKIP LOCKED} so multiple application instances (or
  * multiple poller threads) never process the same row simultaneously.
  *
- * <p><b>Database compatibility:</b> SQL uses PostgreSQL dialect
- * (CTE with {@code RETURNING}, {@code FOR UPDATE SKIP LOCKED},
- * {@code INTERVAL '1 second'} arithmetic).  Adapting to MySQL 8+ or Oracle
- * requires replacing these clauses.
+ * <p><b>Database compatibility:</b> all generated SQL is standard JDBC SQL.
+ * The only non-standard feature used is {@code FOR UPDATE SKIP LOCKED}, which
+ * is supported by PostgreSQL 9.5+, MySQL 8.0+, and Oracle 12c+.  No
+ * database-specific extensions (CTEs with {@code RETURNING}, vendor interval
+ * functions, etc.) are used.
  */
 @Repository
 public class OutboxRepository {
@@ -139,54 +140,56 @@ public class OutboxRepository {
     // ── Private helpers ──────────────────────────────────────────────────────
 
     /**
-     * Atomically claims pending rows and marks them IN_PROGRESS using a
-     * PostgreSQL CTE with {@code RETURNING}.
+     * Claims pending rows in two steps within a single database transaction:
      *
-     * <pre>
-     * WITH candidates AS (
-     *   SELECT "id_col", "key_col", "payload_col"[, "topic_col"][, "headers_col"]
-     *   FROM "table"
-     *   WHERE {pendingClause}
-     *   ORDER BY "id_col"
-     *   LIMIT ?
-     *   FOR UPDATE SKIP LOCKED
-     * )
-     * UPDATE "table" AS t
-     * SET {claimSetFragment}
-     * FROM candidates AS c
-     * WHERE t."id_col" = c."id_col"
-     * RETURNING t."id_col", c."key_col", c."payload_col"[, c."topic_col"][, c."headers_col"]
-     * </pre>
+     * <ol>
+     *   <li><b>SELECT … FOR UPDATE SKIP LOCKED</b> – reads the batch of pending
+     *       rows and acquires a row-level exclusive lock on each one.  Rows
+     *       already locked by another poller instance are silently skipped.
+     *   <li><b>UPDATE … SET status = IN_PROGRESS</b> – marks those exact rows as
+     *       in-progress while the locks from step 1 are still held by the open
+     *       transaction.
+     * </ol>
+     *
+     * <p>Both statements execute inside the {@link Transactional} boundary of
+     * {@link #claimBatch}.  Row locks acquired in step 1 are held at the
+     * <em>transaction</em> level (not the statement level), so they remain in
+     * place until the transaction commits after step 2 completes.  This means
+     * no other poller can claim the same rows between the two steps.
+     *
+     * <p>This two-step approach uses only standard JDBC SQL and is compatible
+     * with any database that supports {@code FOR UPDATE SKIP LOCKED}
+     * (PostgreSQL 9.5+, MySQL 8.0+, Oracle 12c+).
      */
     private List<OutboxRecord> claimWithInProgress(OutboxTableProperties config,
                                                     StatusStrategy strategy) {
         String table = SqlIdentifier.quote(config.getTableName());
         String idCol = SqlIdentifier.quote(config.getIdColumn());
         SqlFragment pendingFrag = strategy.pendingClause(config);
-        SqlFragment claimFrag = strategy.claimSetFragment(config);
 
         String selectList = buildSelectList(config);
-        String returningList = buildReturningList(config);
 
-        String sql = "WITH candidates AS ("
-                + " SELECT " + selectList
+        // ── Step 1: read pending rows and lock them ───────────────────────
+        String selectSql = "SELECT " + selectList
                 + " FROM " + table
                 + " WHERE " + pendingFrag.sql()
                 + " ORDER BY " + idCol
                 + " LIMIT ?"
-                + " FOR UPDATE SKIP LOCKED"
-                + ")"
-                + " UPDATE " + table + " AS t"
-                + " SET " + claimFrag.sql()
-                + " FROM candidates AS c"
-                + " WHERE t." + idCol + " = c." + idCol
-                + " RETURNING " + returningList;
+                + " FOR UPDATE SKIP LOCKED";
 
-        List<Object> params = new ArrayList<>(pendingFrag.params());
-        params.add(config.getBatchSize());
-        params.addAll(claimFrag.params());
+        List<Object> selectParams = new ArrayList<>(pendingFrag.params());
+        selectParams.add(config.getBatchSize());
 
-        return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config), params.toArray());
+        List<OutboxRecord> records =
+                jdbc.query(selectSql, (rs, rowNum) -> mapRow(rs, config), selectParams.toArray());
+
+        if (records.isEmpty()) return records;
+
+        // ── Step 2: mark those rows IN_PROGRESS (locks still held) ────────
+        List<String> ids = records.stream().map(OutboxRecord::id).toList();
+        bulkUpdate(config, strategy.claimSetFragment(config), ids);
+
+        return records;
     }
 
     /**
@@ -217,28 +220,36 @@ public class OutboxRepository {
     /**
      * Executes a bulk UPDATE for the given IDs using a named parameter
      * {@code IN (:ids)} clause.
+     *
+     * <p>Positional {@code ?} placeholders in the SET fragment SQL are replaced
+     * with named parameters ({@code :setParam0}, {@code :setParam1}, …) by
+     * scanning the SQL character by character.  This is more robust than using
+     * {@link String#replaceFirst} in a loop, which would fail if {@code ?}
+     * appeared in unexpected positions (e.g. inside quoted strings).
      */
     private void bulkUpdate(OutboxTableProperties config, SqlFragment setFrag, List<String> ids) {
         String table = SqlIdentifier.quote(config.getTableName());
         String idCol = SqlIdentifier.quote(config.getIdColumn());
 
-        String sql = "UPDATE " + table
-                + " SET " + setFrag.sql()
+        // Convert positional ? placeholders in the SET clause to named params.
+        List<Object> setParamValues = setFrag.params();
+        MapSqlParameterSource params = new MapSqlParameterSource("ids", ids);
+        StringBuilder namedSetSql = new StringBuilder(setFrag.sql().length() + 16);
+        int paramIndex = 0;
+        for (char ch : setFrag.sql().toCharArray()) {
+            if (ch == '?') {
+                String name = "setParam" + paramIndex;
+                namedSetSql.append(':').append(name);
+                params.addValue(name, setParamValues.get(paramIndex));
+                paramIndex++;
+            } else {
+                namedSetSql.append(ch);
+            }
+        }
+
+        String namedSql = "UPDATE " + table
+                + " SET " + namedSetSql
                 + " WHERE " + idCol + " IN (:ids)";
-
-        MapSqlParameterSource params = new MapSqlParameterSource();
-        params.addValue("ids", ids);
-        // Add positional params from the SET fragment as named params
-        List<Object> setParams = setFrag.params();
-        for (int i = 0; i < setParams.size(); i++) {
-            params.addValue("p" + i, setParams.get(i));
-        }
-
-        // Re-build SQL to replace positional ? with named :p0, :p1, …
-        String namedSql = sql;
-        for (int i = 0; i < setParams.size(); i++) {
-            namedSql = namedSql.replaceFirst("\\?", ":p" + i);
-        }
         namedJdbc.update(namedSql, params);
     }
 
@@ -255,24 +266,6 @@ public class OutboxRepository {
         }
         if (config.getHeadersColumn() != null) {
             cols.add(SqlIdentifier.quote(config.getHeadersColumn()));
-        }
-        return String.join(", ", cols);
-    }
-
-    /** Builds the RETURNING list for the CTE update (prefixes non-id cols with alias). */
-    private String buildReturningList(OutboxTableProperties config) {
-        List<String> cols = new ArrayList<>();
-        String idCol = SqlIdentifier.quote(config.getIdColumn());
-        cols.add("t." + idCol);
-        if (config.getKeyColumn() != null) {
-            cols.add("c." + SqlIdentifier.quote(config.getKeyColumn()));
-        }
-        cols.add("c." + SqlIdentifier.quote(config.getPayloadColumn()));
-        if (config.getTopicColumn() != null) {
-            cols.add("c." + SqlIdentifier.quote(config.getTopicColumn()));
-        }
-        if (config.getHeadersColumn() != null) {
-            cols.add("c." + SqlIdentifier.quote(config.getHeadersColumn()));
         }
         return String.join(", ", cols);
     }

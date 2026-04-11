@@ -60,12 +60,20 @@ class EnumStatusStrategyTest {
     }
 
     @Test
-    void stuckClause_containsInProgressAndTtl() {
+    void stuckClause_containsInProgressAndTimestampCutoff() {
         SqlFragment frag = strategy.stuckClause(config());
         assertThat(frag).isNotNull();
         assertThat(frag.sql()).contains("\"status\"");
         assertThat(frag.sql()).contains("\"updated_at\"");
-        assertThat(frag.params()).contains("IN_PROGRESS", 300L);
+        assertThat(frag.sql()).doesNotContain("INTERVAL");
+        // First param is the IN_PROGRESS value; second is a Timestamp cutoff
+        assertThat(frag.params()).hasSize(2);
+        assertThat(frag.params().get(0)).isEqualTo("IN_PROGRESS");
+        assertThat(frag.params().get(1)).isInstanceOf(java.sql.Timestamp.class);
+        // Cutoff should be in the past (roughly now - stuckTtlSeconds)
+        long expectedCutoff = System.currentTimeMillis() - 300_000L;
+        long actualCutoff = ((java.sql.Timestamp) frag.params().get(1)).getTime();
+        assertThat(actualCutoff).isBetween(expectedCutoff - 2_000L, expectedCutoff + 2_000L);
     }
 
     @Test

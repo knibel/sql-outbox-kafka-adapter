@@ -111,7 +111,10 @@ public class OutboxPollerRegistry implements SmartLifecycle {
         return running.get();
     }
 
-    /** Higher phase value means this starts late and stops early. */
+    /** Higher phase value = starts last in startup order; stops first in shutdown order.
+     *  Using {@code MAX_VALUE} ensures pollers start after all infrastructure beans
+     *  (DataSource, KafkaProducer) are ready, and are stopped before them during
+     *  graceful shutdown so in-flight batches can complete cleanly. */
     @Override
     public int getPhase() {
         return Integer.MAX_VALUE;
