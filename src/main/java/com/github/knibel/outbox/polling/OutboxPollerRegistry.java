@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
@@ -23,16 +25,14 @@ import org.springframework.stereotype.Component;
  * platform threads.
  *
  * <p>On {@link #start()}, one virtual thread per table is launched.  Each
- * thread loops:
- * <ol>
- *   <li>Call {@link OutboxPoller#poll()}.
- *   <li>Sleep for {@link OutboxTableProperties#getPollIntervalMs()} ms.
- *   <li>Repeat until interrupted.
- * </ol>
+ * thread loops: poll → sleep → repeat until interrupted.
  *
  * <p>On {@link #stop()}, all virtual threads are interrupted and the registry
- * waits up to 10 seconds for them to finish their current poll cycle before
- * returning.
+ * waits up to 10 seconds for them to finish before returning.
+ *
+ * <p><b>Error handling:</b> if any error occurs during a poll cycle the
+ * application is shut down immediately.  Continuing after an error is not
+ * permitted because it would silently skip records and break message ordering.
  */
 @Component
 public class OutboxPollerRegistry implements SmartLifecycle {
@@ -44,6 +44,7 @@ public class OutboxPollerRegistry implements SmartLifecycle {
     private final OutboxRepository repository;
     private final OutboxKafkaProducer kafkaProducer;
     private final MeterRegistry meterRegistry;
+    private final ApplicationContext applicationContext;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final List<Thread> pollerThreads = new ArrayList<>();
@@ -51,11 +52,13 @@ public class OutboxPollerRegistry implements SmartLifecycle {
     public OutboxPollerRegistry(OutboxProperties outboxProperties,
                                 OutboxRepository repository,
                                 OutboxKafkaProducer kafkaProducer,
-                                MeterRegistry meterRegistry) {
+                                MeterRegistry meterRegistry,
+                                ApplicationContext applicationContext) {
         this.outboxProperties = outboxProperties;
         this.repository = repository;
         this.kafkaProducer = kafkaProducer;
         this.meterRegistry = meterRegistry;
+        this.applicationContext = applicationContext;
     }
 
     // ── SmartLifecycle ───────────────────────────────────────────────────────
@@ -132,16 +135,12 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                // poll() already logs individual errors; catch any unexpected ones here
-                log.error("Unexpected error in poller loop for table '{}': {}",
+                log.error("Fatal error in outbox poller for table '{}' – shutting down application: {}",
                         config.getTableName(), e.getMessage(), e);
-                // Brief back-off to avoid tight error loops
-                try {
-                    Thread.sleep(config.getPollIntervalMs());
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+                // Shut the whole application down to avoid skipping records and
+                // breaking message ordering. The exit code is 1 to signal an error.
+                SpringApplication.exit(applicationContext, () -> 1);
+                return;
             }
         }
         log.debug("Poller loop stopped for table '{}'", config.getTableName());
@@ -157,15 +156,13 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             if (name == null || name.isBlank()) {
                 throw new IllegalArgumentException("outbox table config is missing 'tableName'");
             }
-            // Validate all identifier fields – SqlIdentifier.quote() throws on invalid input
             SqlIdentifier.quote(cfg.getTableName());
             SqlIdentifier.quote(cfg.getIdColumn());
             SqlIdentifier.quote(cfg.getStatusColumn());
             SqlIdentifier.quote(cfg.getPayloadColumn());
-            if (cfg.getKeyColumn() != null)      SqlIdentifier.quote(cfg.getKeyColumn());
-            if (cfg.getTopicColumn() != null)    SqlIdentifier.quote(cfg.getTopicColumn());
-            if (cfg.getHeadersColumn() != null)  SqlIdentifier.quote(cfg.getHeadersColumn());
-            if (cfg.getUpdatedAtColumn() != null) SqlIdentifier.quote(cfg.getUpdatedAtColumn());
+            if (cfg.getKeyColumn() != null)     SqlIdentifier.quote(cfg.getKeyColumn());
+            if (cfg.getTopicColumn() != null)   SqlIdentifier.quote(cfg.getTopicColumn());
+            if (cfg.getHeadersColumn() != null) SqlIdentifier.quote(cfg.getHeadersColumn());
 
             if (cfg.getTopicColumn() == null
                     && (cfg.getStaticTopic() == null || cfg.getStaticTopic().isBlank())) {

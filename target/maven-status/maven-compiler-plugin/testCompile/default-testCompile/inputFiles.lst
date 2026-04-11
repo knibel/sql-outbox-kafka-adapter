@@ -1,5 +1,0 @@
-/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/github/knibel/outbox/domain/BooleanStatusStrategyTest.java
-/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/github/knibel/outbox/domain/EnumStatusStrategyTest.java
-/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/github/knibel/outbox/domain/TimestampStatusStrategyTest.java
-/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/github/knibel/outbox/integration/OutboxIntegrationTest.java
-/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/src/test/java/com/github/knibel/outbox/jdbc/SqlIdentifierTest.java

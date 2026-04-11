@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.github.knibel.outbox.integration.OutboxIntegrationTest
--------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 15.72 s -- in com.github.knibel.outbox.integration.OutboxIntegrationTest

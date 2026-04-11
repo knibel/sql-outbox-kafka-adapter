@@ -7,10 +7,12 @@ spring:
     url: jdbc:postgresql://localhost:5432/test
     username: test
     password: test
-  # Disable schema auto-creation; tests manage their own DDL
+  # Create the test_outbox table before the poller SmartLifecycle starts.
+  # Spring Boot's SQL init runs during context refresh, before SmartLifecycle.start().
   sql:
     init:
-      mode: never
+      mode: always
+      schema-locations: classpath:schema-test.sql
 
 management:
   endpoints:

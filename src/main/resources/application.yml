@@ -1,8 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL → Kafka Outbox Adapter – application.yml
 #
-# Copy this file and fill in your values.  Every property is listed here with
-# its default (if any) and a description.
+# Copy this file and fill in your values. Every property is documented here.
 # ─────────────────────────────────────────────────────────────────────────────
 
 spring:
@@ -18,7 +17,7 @@ spring:
       # Maximum number of connections in the pool.
       # Rule of thumb: number of poller threads × 2, minimum 10.
       maximum-pool-size: 10
-      # Connection timeout (ms).  Fail fast rather than queue forever.
+      # Connection timeout (ms). Fail fast rather than queue forever.
       connection-timeout: 5000
       # How long a connection can sit idle before being evicted (ms).
       idle-timeout: 600000
@@ -60,21 +59,24 @@ outbox:
     producer-properties: {}
 
   # ── Outbox tables ────────────────────────────────────────────────────────────
-  # One entry per outbox table.  Multiple tables are polled concurrently,
+  # One entry per outbox table. Multiple tables are polled concurrently,
   # each in its own virtual thread.
+  #
+  # Each row moves from pendingValue → doneValue in the statusColumn.
+  # Any error during a poll cycle shuts the application down immediately
+  # to preserve message ordering.
   tables:
 
-    # ── Example 1: ENUM strategy (recommended for effectively-once) ───────────
-    - # Name of the database table to poll.  Required.
+    - # Name of the database table to poll. Required.
       tableName: orders_outbox
 
-      # How often to poll for new rows (milliseconds).  Default: 1000.
+      # How often to poll for new rows (milliseconds). Default: 1000.
       pollIntervalMs: 500
 
-      # Maximum rows per poll cycle.  Default: 100.
+      # Maximum rows per poll cycle. Default: 100.
       batchSize: 100
 
-      # Primary-key column.  Used for ordering, locking, and bulk UPDATEs.
+      # Primary-key column. Used for ordering, locking, and bulk UPDATEs.
       # Default: "id".
       idColumn: id
 
@@ -87,7 +89,7 @@ outbox:
       payloadColumn: payload
 
       # Optional column containing a JSON object whose entries become Kafka
-      # record headers.  Example column value: {"correlation-id": "abc123"}.
+      # record headers. Example value: {"correlation-id": "abc123"}.
       # Omit or leave null to send no headers.
       headersColumn: headers_json
 
@@ -101,63 +103,11 @@ outbox:
       staticTopic: orders
 
       # ── Status tracking ─────────────────────────────────────────────────────
-      # Column that tracks processing status.  Default: "status".
+      # Column that tracks processing status. Default: "status".
       statusColumn: status
 
-      # Strategy used to interpret the status column.
-      # ENUM      – string values (PENDING / IN_PROGRESS / DONE). Recommended.
-      # TIMESTAMP – nullable timestamp (NULL = pending, NOW() = done).
-      # BOOLEAN   – boolean (false = pending, true = done).
-      # Default: ENUM.
-      statusStrategy: ENUM
-
-      # String value meaning "not yet processed".  ENUM strategy only.
-      # Default: "PENDING".
+      # Value that means "not yet processed". Default: "PENDING".
       pendingValue: PENDING
 
-      # String value meaning "currently being processed".  ENUM strategy only.
-      # Rows stuck in this state are reset after stuckTtlSeconds.
-      # Default: "IN_PROGRESS".
-      inProgressValue: IN_PROGRESS
-
-      # String value meaning "successfully published".  ENUM strategy only.
-      # Default: "DONE".
+      # Value that means "successfully published to Kafka". Default: "DONE".
       doneValue: DONE
-
-      # String value meaning "permanently failed".  ENUM strategy only.
-      # Default: "FAILED".
-      failedValue: FAILED
-
-      # ── Stuck-row recovery (ENUM strategy only) ──────────────────────────────
-      # Column used to detect stuck rows (rows that were claimed to IN_PROGRESS
-      # but never completed because of a JVM crash).
-      # Must be a TIMESTAMP column updated whenever the row changes.
-      # Leave null to disable stuck-row detection for this table.
-      updatedAtColumn: updated_at
-
-      # After how many seconds an IN_PROGRESS row is considered stuck and reset
-      # to PENDING.  Default: 300 (5 minutes).
-      stuckTtlSeconds: 300
-
-    # ── Example 2: TIMESTAMP strategy (two-state, at-least-once) ─────────────
-    - tableName: payments_outbox
-      pollIntervalMs: 1000
-      batchSize: 50
-      idColumn: id
-      keyColumn: payment_id
-      payloadColumn: event_json
-      staticTopic: payments
-      statusColumn: processed_at   # nullable TIMESTAMP WITH TIME ZONE column
-      statusStrategy: TIMESTAMP
-      # pendingValue / inProgressValue / doneValue not used for TIMESTAMP
-      # stuckTtlSeconds / updatedAtColumn not applicable
-
-    # ── Example 3: BOOLEAN strategy (two-state, at-least-once) ───────────────
-    # - tableName: notifications_outbox
-    #   pollIntervalMs: 2000
-    #   batchSize: 200
-    #   idColumn: id
-    #   payloadColumn: message_body
-    #   staticTopic: notifications
-    #   statusColumn: published         # BOOLEAN NOT NULL DEFAULT FALSE column
-    #   statusStrategy: BOOLEAN

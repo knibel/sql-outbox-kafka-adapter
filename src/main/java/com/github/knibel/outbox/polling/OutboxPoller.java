@@ -13,18 +13,18 @@ import org.slf4j.LoggerFactory;
 /**
  * Executes one poll cycle for a single outbox table.
  *
- * <p>The cycle follows the two-phase commit pattern:
+ * <p>The cycle:
  * <ol>
- *   <li><b>Reset stuck rows</b> – rows that were claimed to IN_PROGRESS but
- *       never completed (JVM crash) are reset to PENDING (ENUM strategy only).
- *   <li><b>Claim</b> – atomically claim a batch of PENDING rows.
- *       For ENUM strategy, rows are marked IN_PROGRESS; for TIMESTAMP/BOOLEAN,
- *       they are selected with {@code FOR UPDATE SKIP LOCKED}.
- *   <li><b>Publish</b> – each claimed row is sent to Kafka.
- *       After {@code producer.flush()} confirms all acknowledgements, …
- *   <li><b>Mark done</b> – all rows in the batch are marked DONE/PROCESSED.
- *       If publishing fails, rows are marked FAILED instead.
+ *   <li><b>Claim</b> – select a batch of pending rows with
+ *       {@code FOR UPDATE SKIP LOCKED}.
+ *   <li><b>Publish</b> – send each row to Kafka and flush.
+ *   <li><b>Mark done</b> – update all rows in the batch to the done value.
  * </ol>
+ *
+ * <p>Any exception from any step is propagated to the caller
+ * ({@link OutboxPollerRegistry}), which will shut the application down.
+ * Continuing after a failure is not permitted because it would break
+ * message ordering.
  *
  * <p>This class is intentionally <em>not</em> a Spring bean; instances are
  * created and managed by {@link OutboxPollerRegistry}.
@@ -38,7 +38,6 @@ public class OutboxPoller {
     private final OutboxKafkaProducer kafkaProducer;
     private final Counter claimedCounter;
     private final Counter doneCounter;
-    private final Counter failedCounter;
 
     OutboxPoller(OutboxTableProperties config,
                  OutboxRepository repository,
@@ -57,31 +56,17 @@ public class OutboxPoller {
                 .description("Number of outbox rows successfully published to Kafka")
                 .tag("table", table)
                 .register(meterRegistry);
-        this.failedCounter = Counter.builder("outbox.rows.failed")
-                .description("Number of outbox rows that failed to publish to Kafka")
-                .tag("table", table)
-                .register(meterRegistry);
     }
 
     /**
-     * Executes one poll cycle.  All exceptions are caught and logged; the
-     * caller (virtual thread loop in {@link OutboxPollerRegistry}) will retry
-     * on the next interval.
+     * Executes one poll cycle.
+     *
+     * <p>Any exception is propagated to the caller without being swallowed.
+     * This ensures that an error stops the application rather than silently
+     * skipping records and breaking ordering.
      */
     public void poll() {
-        try {
-            resetStuck();
-        } catch (Exception e) {
-            log.warn("Stuck-row reset failed for table '{}': {}", config.getTableName(), e.getMessage());
-        }
-
-        List<OutboxRecord> records;
-        try {
-            records = repository.claimBatch(config);
-        } catch (Exception e) {
-            log.error("Failed to claim batch from table '{}': {}", config.getTableName(), e.getMessage(), e);
-            return;
-        }
+        List<OutboxRecord> records = repository.claimBatch(config);
 
         if (records.isEmpty()) {
             return;
@@ -91,29 +76,10 @@ public class OutboxPoller {
         log.debug("Claimed {} row(s) from table '{}'", records.size(), config.getTableName());
 
         List<String> ids = records.stream().map(OutboxRecord::id).toList();
-        try {
-            kafkaProducer.sendBatch(records);
-            repository.markDone(config, ids);
-            doneCounter.increment(ids.size());
-            log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
-        } catch (Exception e) {
-            failedCounter.increment(ids.size());
-            log.error("Failed to publish batch from table '{}'; marking {} row(s) as failed: {}",
-                    config.getTableName(), ids.size(), e.getMessage(), e);
-            try {
-                repository.markFailed(config, ids);
-            } catch (Exception dbEx) {
-                log.error("Could not mark rows as failed in table '{}'; rows may remain stuck in IN_PROGRESS: {}",
-                        config.getTableName(), dbEx.getMessage(), dbEx);
-            }
-        }
-    }
-
-    private void resetStuck() {
-        int count = repository.resetStuck(config);
-        if (count > 0) {
-            log.warn("Recovered {} stuck row(s) in table '{}'", count, config.getTableName());
-        }
+        kafkaProducer.sendBatch(records);
+        repository.markDone(config, ids);
+        doneCounter.increment(ids.size());
+        log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
     }
 
     OutboxTableProperties getConfig() {

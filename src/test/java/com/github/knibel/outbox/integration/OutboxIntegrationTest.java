@@ -44,18 +44,14 @@ import static org.awaitility.Awaitility.await;
  *
  * <ol>
  *   <li>Rows are inserted with {@code status='PENDING'}.
- *   <li>The poller claims them, publishes to Kafka, and marks them {@code DONE}.
+ *   <li>The poller picks them up, publishes to Kafka, and marks them {@code DONE}.
  *   <li>A test Kafka consumer confirms the expected messages arrived.
  *   <li>The database rows are verified to have {@code status='DONE'}.
  * </ol>
- *
- * <p>Awaitility is used (included in spring-boot-starter-test) to wait for
- * the asynchronous poller to complete without brittle {@code Thread.sleep} calls.
  */
 @SpringBootTest(
         classes = Application.class,
         properties = {
-                // ── Outbox table config ──────────────────────────────────────
                 "outbox.tables[0].tableName=test_outbox",
                 "outbox.tables[0].idColumn=id",
                 "outbox.tables[0].keyColumn=aggregate_id",
@@ -63,15 +59,10 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].headersColumn=headers_json",
                 "outbox.tables[0].staticTopic=test-topic",
                 "outbox.tables[0].statusColumn=status",
-                "outbox.tables[0].statusStrategy=ENUM",
                 "outbox.tables[0].pendingValue=PENDING",
-                "outbox.tables[0].inProgressValue=IN_PROGRESS",
                 "outbox.tables[0].doneValue=DONE",
-                "outbox.tables[0].failedValue=FAILED",
-                "outbox.tables[0].updatedAtColumn=updated_at",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
-                "outbox.tables[0].stuckTtlSeconds=30",
         }
 )
 @Testcontainers
@@ -104,9 +95,7 @@ class OutboxIntegrationTest {
 
     /**
      * Pre-create the Kafka topic so consumers can subscribe at a known offset
-     * before any producer sends to it.  Without this, the first test's consumer
-     * may miss early messages because the topic is auto-created by the producer
-     * after the consumer has already positioned at "latest".
+     * before any producer sends to it.
      */
     @BeforeAll
     static void createKafkaTopic() throws Exception {
@@ -129,26 +118,14 @@ class OutboxIntegrationTest {
 
     KafkaConsumer<String, String> consumer;
 
-    private static final String TABLE_DDL = """
-            CREATE TABLE IF NOT EXISTS test_outbox (
-                id           VARCHAR(36)  PRIMARY KEY,
-                aggregate_id VARCHAR(100) NOT NULL,
-                payload      TEXT         NOT NULL,
-                headers_json TEXT,
-                status       VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
-                updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
-            )
-            """;
-
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute(TABLE_DDL);
         jdbcTemplate.execute("TRUNCATE TABLE test_outbox");
 
         consumer = createConsumer(kafka.getBootstrapServers());
         consumer.subscribe(Collections.singletonList("test-topic"));
-        // Trigger partition assignment at the current log end so we only see
-        // messages produced during this test (not leftovers from previous tests).
+        // Seek to the current end of the log so we only see messages produced
+        // during this test (not leftovers from previous tests).
         consumer.poll(Duration.ofMillis(500));
     }
 
@@ -161,11 +138,10 @@ class OutboxIntegrationTest {
 
     @Test
     void shouldPublishPendingRowsToKafkaAndMarkThem_done() {
-        // ── Arrange ────────────────────────────────────────────────────────
         int rowCount = 5;
         List<String> ids = insertPendingRows(rowCount);
 
-        // ── Act & Assert – DB rows ─────────────────────────────────────────
+        // Wait until all rows are marked DONE in the database.
         await().atMost(Duration.ofSeconds(15))
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
@@ -178,13 +154,11 @@ class OutboxIntegrationTest {
                             .allMatch("DONE"::equals);
                 });
 
-        // ── Assert – Kafka messages ────────────────────────────────────────
+        // Verify the corresponding Kafka messages arrived.
         List<ConsumerRecord<String, String>> received = pollAllMessages(rowCount);
         assertThat(received).hasSize(rowCount);
 
-        List<String> receivedKeys = received.stream()
-                .map(ConsumerRecord::key)
-                .toList();
+        List<String> receivedKeys = received.stream().map(ConsumerRecord::key).toList();
         assertThat(receivedKeys).containsExactlyInAnyOrderElementsOf(ids);
 
         for (ConsumerRecord<String, String> record : received) {
@@ -193,34 +167,10 @@ class OutboxIntegrationTest {
     }
 
     @Test
-    void shouldResetStuckRowsAndReprocess() {
-        // Insert a row that is already IN_PROGRESS with an old updated_at
-        String id = UUID.randomUUID().toString();
-        jdbcTemplate.update(
-                "INSERT INTO test_outbox (id, aggregate_id, payload, status, updated_at) "
-                + "VALUES (?, ?, ?, 'IN_PROGRESS', NOW() - INTERVAL '10 minutes')",
-                id, id, "{\"event\":\"STUCK\"}");
-
-        // The poller should reset the stuck row to PENDING and then process it.
-        await().atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofMillis(300))
-                .untilAsserted(() -> {
-                    String status = jdbcTemplate.queryForObject(
-                            "SELECT status FROM test_outbox WHERE id = ?",
-                            String.class, id);
-                    assertThat(status).isEqualTo("DONE");
-                });
-
-        List<ConsumerRecord<String, String>> received = pollAllMessages(1);
-        assertThat(received).hasSize(1);
-        assertThat(received.get(0).key()).isEqualTo(id);
-    }
-
-    @Test
     void shouldProcessLargeBatchInMultipleCycles() {
-        // Insert more rows than batchSize to verify multiple poll cycles
-        int rowCount = 25; // batchSize is 10, so this requires 3 cycles
-        List<String> ids = insertPendingRows(rowCount);
+        // Insert more rows than batchSize (10) to exercise multiple poll cycles.
+        int rowCount = 25;
+        insertPendingRows(rowCount);
 
         await().atMost(Duration.ofSeconds(20))
                 .pollInterval(Duration.ofMillis(300))
@@ -271,8 +221,6 @@ class OutboxIntegrationTest {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "outbox-test-consumer-" + UUID.randomUUID());
-        // Start at the end of the log so we only see messages produced during
-        // this test (the initial poll in @BeforeEach commits the "latest" position).
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

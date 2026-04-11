@@ -1,21 +1,11 @@
 package com.github.knibel.outbox.config;
 
-import com.github.knibel.outbox.domain.StatusStrategyType;
-
 /**
  * Configuration for a single outbox table.
  *
- * <p><b>Status strategies</b>
- * <ul>
- *   <li>{@code ENUM} – uses string values for PENDING / IN_PROGRESS / DONE.
- *       Provides effectively-once semantics: rows are claimed atomically to
- *       IN_PROGRESS before Kafka publishing; stuck-row recovery resets them.
- *   <li>{@code TIMESTAMP} – a nullable timestamp column: {@code NULL} means
- *       pending, {@code CURRENT_TIMESTAMP} means done. At-least-once semantics
- *       (no in-progress state; relies on {@code FOR UPDATE SKIP LOCKED}).
- *   <li>{@code BOOLEAN} – a boolean column: {@code false} means pending,
- *       {@code true} means done. At-least-once semantics.
- * </ul>
+ * <p>Each row transitions from {@code pendingValue} to {@code doneValue} in
+ * the {@code statusColumn}.  If any error occurs during publishing the
+ * application shuts down to preserve record ordering.
  *
  * <p><b>Topic routing</b>
  * <ul>
@@ -43,7 +33,7 @@ public class OutboxTableProperties {
 
     // ── Column mapping ───────────────────────────────────────────────────────
 
-    /** Primary-key column (also used as Kafka idempotency key base). Required. */
+    /** Primary-key column (also used as Kafka record key when {@code keyColumn} is absent). Required. */
     private String idColumn = "id";
 
     /**
@@ -76,50 +66,16 @@ public class OutboxTableProperties {
     private String statusColumn = "status";
 
     /**
-     * Strategy used to interpret / update the status column.
-     * Default: {@code ENUM}.
-     */
-    private StatusStrategyType statusStrategy = StatusStrategyType.ENUM;
-
-    /**
-     * Value (or SQL expression) representing a row that has not yet been
-     * processed. Used by {@code ENUM} strategy. Default: {@code "PENDING"}.
+     * Value in {@code statusColumn} that marks a row as not yet processed.
+     * Default: {@code "PENDING"}.
      */
     private String pendingValue = "PENDING";
 
     /**
-     * Value representing a row currently being processed.
-     * Used by {@code ENUM} strategy only. Default: {@code "IN_PROGRESS"}.
-     */
-    private String inProgressValue = "IN_PROGRESS";
-
-    /**
-     * Value representing a successfully processed row.
-     * Used by {@code ENUM} strategy only. Default: {@code "DONE"}.
+     * Value in {@code statusColumn} that marks a row as successfully processed.
+     * Default: {@code "DONE"}.
      */
     private String doneValue = "DONE";
-
-    /**
-     * Value representing a permanently failed row.
-     * Used by {@code ENUM} strategy only. Default: {@code "FAILED"}.
-     */
-    private String failedValue = "FAILED";
-
-    // ── Stuck-row recovery (ENUM strategy only) ───────────────────────────────
-
-    /**
-     * Column used to detect stuck rows (rows that were claimed to IN_PROGRESS
-     * but never completed, typically due to a JVM crash).
-     * Must be a timestamp column that is updated whenever the row is modified.
-     * If null, stuck-row detection is disabled for this table.
-     */
-    private String updatedAtColumn;
-
-    /**
-     * Number of seconds after which an IN_PROGRESS row is considered stuck
-     * and reset to PENDING. Default: 300 (5 minutes).
-     */
-    private long stuckTtlSeconds = 300;
 
     // ── Getters / setters ─────────────────────────────────────────────────────
 
@@ -153,24 +109,9 @@ public class OutboxTableProperties {
     public String getStatusColumn() { return statusColumn; }
     public void setStatusColumn(String statusColumn) { this.statusColumn = statusColumn; }
 
-    public StatusStrategyType getStatusStrategy() { return statusStrategy; }
-    public void setStatusStrategy(StatusStrategyType statusStrategy) { this.statusStrategy = statusStrategy; }
-
     public String getPendingValue() { return pendingValue; }
     public void setPendingValue(String pendingValue) { this.pendingValue = pendingValue; }
 
-    public String getInProgressValue() { return inProgressValue; }
-    public void setInProgressValue(String inProgressValue) { this.inProgressValue = inProgressValue; }
-
     public String getDoneValue() { return doneValue; }
     public void setDoneValue(String doneValue) { this.doneValue = doneValue; }
-
-    public String getFailedValue() { return failedValue; }
-    public void setFailedValue(String failedValue) { this.failedValue = failedValue; }
-
-    public String getUpdatedAtColumn() { return updatedAtColumn; }
-    public void setUpdatedAtColumn(String updatedAtColumn) { this.updatedAtColumn = updatedAtColumn; }
-
-    public long getStuckTtlSeconds() { return stuckTtlSeconds; }
-    public void setStuckTtlSeconds(long stuckTtlSeconds) { this.stuckTtlSeconds = stuckTtlSeconds; }
 }
