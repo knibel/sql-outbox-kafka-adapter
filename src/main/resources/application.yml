@@ -140,14 +140,24 @@ outbox:
 
       # ── CUSTOM strategy settings ──────────────────────────────────────────
       # Required only when rowMappingStrategy: CUSTOM.
-      # Keys are source SQL column names; values are target JSON field paths.
-      # Dot-separated paths produce nested JSON objects.
+      # Keys are source SQL column names; values have:
+      #   - name: target JSON field path (dot-separated for nesting)
+      #   - dataType: (optional) target data type for conversion
+      #     Allowed: STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DECIMAL
+      #     When omitted, the JDBC driver's default Java mapping is used.
       # Example:
       #   fieldMappings:
-      #     order_id: orderId
-      #     customer_name: customer.name
-      #     customer_email: customer.email
-      # Produces: {"orderId":"…","customer":{"name":"…","email":"…"}}
+      #     order_id:
+      #       name: orderId
+      #       dataType: STRING
+      #     total_amount:
+      #       name: totalAmount
+      #       dataType: DOUBLE
+      #     customer_name:
+      #       name: customer.name
+      #     customer_email:
+      #       name: customer.email
+      # Produces: {"orderId":"…","totalAmount":99.95,"customer":{"name":"…","email":"…"}}
 logging:
   level:
     org.apache.kafka.clients: WARN

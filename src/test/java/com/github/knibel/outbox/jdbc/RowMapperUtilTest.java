@@ -1,5 +1,7 @@
 package com.github.knibel.outbox.jdbc;
 
+import com.github.knibel.outbox.config.FieldDataType;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -102,5 +104,77 @@ class RowMapperUtilTest {
         assertThat(customer)
                 .containsEntry("name", "John")
                 .containsEntry("email", "john@example.com");
+    }
+
+    // ── convertValue ─────────────────────────────────────────────────────────
+
+    @Test
+    void convertValue_nullDataType_returnsValueUnchanged() {
+        assertThat(RowMapperUtil.convertValue("hello", null)).isEqualTo("hello");
+        assertThat(RowMapperUtil.convertValue(42, null)).isEqualTo(42);
+    }
+
+    @Test
+    void convertValue_nullValue_returnsNull() {
+        assertThat(RowMapperUtil.convertValue(null, FieldDataType.STRING)).isNull();
+        assertThat(RowMapperUtil.convertValue(null, FieldDataType.INTEGER)).isNull();
+    }
+
+    @Test
+    void convertValue_toString() {
+        assertThat(RowMapperUtil.convertValue(42, FieldDataType.STRING)).isEqualTo("42");
+        assertThat(RowMapperUtil.convertValue(3.14, FieldDataType.STRING)).isEqualTo("3.14");
+        assertThat(RowMapperUtil.convertValue(true, FieldDataType.STRING)).isEqualTo("true");
+        assertThat(RowMapperUtil.convertValue("already", FieldDataType.STRING)).isEqualTo("already");
+    }
+
+    @Test
+    void convertValue_toInteger_fromNumber() {
+        assertThat(RowMapperUtil.convertValue(42L, FieldDataType.INTEGER)).isEqualTo(42);
+        assertThat(RowMapperUtil.convertValue(3.9, FieldDataType.INTEGER)).isEqualTo(3);
+        assertThat(RowMapperUtil.convertValue(new BigDecimal("100"), FieldDataType.INTEGER)).isEqualTo(100);
+    }
+
+    @Test
+    void convertValue_toInteger_fromString() {
+        assertThat(RowMapperUtil.convertValue("123", FieldDataType.INTEGER)).isEqualTo(123);
+    }
+
+    @Test
+    void convertValue_toLong_fromNumber() {
+        assertThat(RowMapperUtil.convertValue(42, FieldDataType.LONG)).isEqualTo(42L);
+        assertThat(RowMapperUtil.convertValue(3.9, FieldDataType.LONG)).isEqualTo(3L);
+    }
+
+    @Test
+    void convertValue_toLong_fromString() {
+        assertThat(RowMapperUtil.convertValue("9876543210", FieldDataType.LONG)).isEqualTo(9876543210L);
+    }
+
+    @Test
+    void convertValue_toDouble_fromNumber() {
+        assertThat(RowMapperUtil.convertValue(42, FieldDataType.DOUBLE)).isEqualTo(42.0);
+        assertThat(RowMapperUtil.convertValue(new BigDecimal("99.95"), FieldDataType.DOUBLE)).isEqualTo(99.95);
+    }
+
+    @Test
+    void convertValue_toDouble_fromString() {
+        assertThat(RowMapperUtil.convertValue("3.14", FieldDataType.DOUBLE)).isEqualTo(3.14);
+    }
+
+    @Test
+    void convertValue_toBoolean() {
+        assertThat(RowMapperUtil.convertValue(true, FieldDataType.BOOLEAN)).isEqualTo(true);
+        assertThat(RowMapperUtil.convertValue(false, FieldDataType.BOOLEAN)).isEqualTo(false);
+        assertThat(RowMapperUtil.convertValue("true", FieldDataType.BOOLEAN)).isEqualTo(true);
+        assertThat(RowMapperUtil.convertValue("false", FieldDataType.BOOLEAN)).isEqualTo(false);
+    }
+
+    @Test
+    void convertValue_toDecimal() {
+        assertThat(RowMapperUtil.convertValue(42, FieldDataType.DECIMAL)).isEqualTo(new BigDecimal("42"));
+        assertThat(RowMapperUtil.convertValue("99.95", FieldDataType.DECIMAL)).isEqualTo(new BigDecimal("99.95"));
+        BigDecimal bd = new BigDecimal("123.456");
+        assertThat(RowMapperUtil.convertValue(bd, FieldDataType.DECIMAL)).isSameAs(bd);
     }
 }

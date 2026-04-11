@@ -1,5 +1,6 @@
 package com.github.knibel.outbox.polling;
 
+import com.github.knibel.outbox.config.FieldMapping;
 import com.github.knibel.outbox.config.OutboxProperties;
 import com.github.knibel.outbox.config.OutboxTableProperties;
 import com.github.knibel.outbox.config.RowMappingStrategy;
@@ -186,10 +187,11 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                 }
                 for (var entry : cfg.getFieldMappings().entrySet()) {
                     SqlIdentifier.quote(entry.getKey());
-                    if (entry.getValue() == null || entry.getValue().isBlank()) {
+                    FieldMapping mapping = entry.getValue();
+                    if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
                         throw new IllegalArgumentException(
-                                "Table '" + name + "': fieldMappings value for column '"
-                                + entry.getKey() + "' must not be blank");
+                                "Table '" + name + "': fieldMappings entry for column '"
+                                + entry.getKey() + "' must have a non-blank 'name'");
                     }
                 }
             }

@@ -27,5 +27,7 @@ CREATE TABLE IF NOT EXISTS custom_mapping_outbox (
     customer_name   VARCHAR(100),
     customer_email  VARCHAR(200),
     city            VARCHAR(100),
+    total_amount    NUMERIC(10,2),
+    is_active       BOOLEAN DEFAULT TRUE,
     status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
 );
