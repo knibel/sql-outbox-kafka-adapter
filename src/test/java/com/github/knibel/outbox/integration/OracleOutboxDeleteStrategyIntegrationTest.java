@@ -118,7 +118,7 @@ class OracleOutboxDeleteStrategyIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute("TRUNCATE TABLE test_outbox");
+        jdbcTemplate.execute("TRUNCATE TABLE \"test_outbox\"");
 
         consumer = createConsumer(kafkaBootstrapServers);
         consumer.subscribe(Collections.singletonList("oracle-delete-topic"));
@@ -141,7 +141,7 @@ class OracleOutboxDeleteStrategyIntegrationTest {
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     int remaining = namedJdbc.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox WHERE id IN (:ids)",
+                            "SELECT COUNT(*) FROM \"test_outbox\" WHERE \"id\" IN (:ids)",
                             new MapSqlParameterSource("ids", ids),
                             Integer.class);
                     assertThat(remaining).isZero();
@@ -167,7 +167,7 @@ class OracleOutboxDeleteStrategyIntegrationTest {
                 .pollInterval(Duration.ofMillis(300))
                 .untilAsserted(() -> {
                     int remaining = jdbcTemplate.queryForObject(
-                            "SELECT COUNT(*) FROM test_outbox",
+                            "SELECT COUNT(*) FROM \"test_outbox\"",
                             Integer.class);
                     assertThat(remaining).isZero();
                 });
@@ -184,7 +184,7 @@ class OracleOutboxDeleteStrategyIntegrationTest {
             String id = UUID.randomUUID().toString();
             ids.add(id);
             jdbcTemplate.update(
-                    "INSERT INTO test_outbox (id, aggregate_id, payload, headers_json) "
+                    "INSERT INTO \"test_outbox\" (\"id\", \"aggregate_id\", \"payload\", \"headers_json\") "
                     + "VALUES (?, ?, ?, ?)",
                     id,
                     id,
