@@ -77,9 +77,15 @@ public class OutboxPoller {
 
         List<String> ids = records.stream().map(OutboxRecord::id).toList();
         kafkaProducer.sendBatch(records);
-        repository.markDone(config, ids);
-        doneCounter.increment(ids.size());
-        log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
+        if (config.isDeleteAfterPublish()) {
+            repository.deleteByIds(config, ids);
+            doneCounter.increment(ids.size());
+            log.debug("Deleted {} row(s) from table '{}'", ids.size(), config.getTableName());
+        } else {
+            repository.markDone(config, ids);
+            doneCounter.increment(ids.size());
+            log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
+        }
     }
 
     OutboxTableProperties getConfig() {

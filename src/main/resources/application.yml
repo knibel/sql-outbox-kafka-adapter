@@ -110,4 +110,10 @@ outbox:
       pendingValue: PENDING
 
       # Value that means "successfully published to Kafka". Default: "DONE".
+      # Ignored when deleteAfterPublish is true.
       doneValue: DONE
+
+      # When true, rows are deleted from the table after being successfully
+      # published to Kafka instead of being updated to doneValue.
+      # Default: false.
+      deleteAfterPublish: false

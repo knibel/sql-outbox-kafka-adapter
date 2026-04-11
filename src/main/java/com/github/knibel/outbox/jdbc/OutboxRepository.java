@@ -97,6 +97,25 @@ public class OutboxRepository {
         namedJdbc.update(sql, params);
     }
 
+    /**
+     * Deletes all given rows (successfully published to Kafka).
+     */
+    @Transactional
+    public void deleteByIds(OutboxTableProperties config, List<String> ids) {
+        if (ids.isEmpty()) return;
+
+        String table = SqlIdentifier.quote(config.getTableName());
+        String idCol = SqlIdentifier.quote(config.getIdColumn());
+
+        String sql = "DELETE FROM " + table
+                + " WHERE " + idCol + " IN (:ids)";
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("ids", ids);
+
+        namedJdbc.update(sql, params);
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     /** Builds the comma-separated SELECT column list. */

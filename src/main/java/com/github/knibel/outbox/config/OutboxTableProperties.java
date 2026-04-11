@@ -74,8 +74,16 @@ public class OutboxTableProperties {
     /**
      * Value in {@code statusColumn} that marks a row as successfully processed.
      * Default: {@code "DONE"}.
+     * Ignored when {@code deleteAfterPublish} is {@code true}.
      */
     private String doneValue = "DONE";
+
+    /**
+     * When {@code true}, rows are deleted from the table after being successfully
+     * published to Kafka instead of being updated to {@code doneValue}.
+     * Default: {@code false}.
+     */
+    private boolean deleteAfterPublish = false;
 
     // ── Getters / setters ─────────────────────────────────────────────────────
 
@@ -114,4 +122,7 @@ public class OutboxTableProperties {
 
     public String getDoneValue() { return doneValue; }
     public void setDoneValue(String doneValue) { this.doneValue = doneValue; }
+
+    public boolean isDeleteAfterPublish() { return deleteAfterPublish; }
+    public void setDeleteAfterPublish(boolean deleteAfterPublish) { this.deleteAfterPublish = deleteAfterPublish; }
 }
