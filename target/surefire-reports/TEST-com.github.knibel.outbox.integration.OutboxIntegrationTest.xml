@@ -1,0 +1,707 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.github.knibel.outbox.integration.OutboxIntegrationTest" time="24.433" tests="3" errors="0" skipped="0" failures="1">
+  <properties>
+    <property name="java.specification.version" value="25"/>
+    <property name="sun.jnu.encoding" value="UTF-8"/>
+    <property name="java.class.path" value="/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/test-classes:/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/classes:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-jdbc/3.4.4/spring-boot-starter-jdbc-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter/3.4.4/spring-boot-starter-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot/3.4.4/spring-boot-3.4.4.jar:/home/runner/.m2/repository/org/springframework/spring-context/6.2.5/spring-context-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-aop/6.2.5/spring-aop-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-expression/6.2.5/spring-expression-6.2.5.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-autoconfigure/3.4.4/spring-boot-autoconfigure-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-logging/3.4.4/spring-boot-starter-logging-3.4.4.jar:/home/runner/.m2/repository/ch/qos/logback/logback-classic/1.5.18/logback-classic-1.5.18.jar:/home/runner/.m2/repository/ch/qos/logback/logback-core/1.5.18/logback-core-1.5.18.jar:/home/runner/.m2/repository/org/apache/logging/log4j/log4j-to-slf4j/2.24.3/log4j-to-slf4j-2.24.3.jar:/home/runner/.m2/repository/org/apache/logging/log4j/log4j-api/2.24.3/log4j-api-2.24.3.jar:/home/runner/.m2/repository/org/slf4j/jul-to-slf4j/2.0.17/jul-to-slf4j-2.0.17.jar:/home/runner/.m2/repository/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1.jar:/home/runner/.m2/repository/org/yaml/snakeyaml/2.3/snakeyaml-2.3.jar:/home/runner/.m2/repository/com/zaxxer/HikariCP/5.1.0/HikariCP-5.1.0.jar:/home/runner/.m2/repository/org/springframework/spring-jdbc/6.2.5/spring-jdbc-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-beans/6.2.5/spring-beans-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-tx/6.2.5/spring-tx-6.2.5.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-actuator/3.4.4/spring-boot-starter-actuator-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-actuator-autoconfigure/3.4.4/spring-boot-actuator-autoconfigure-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-actuator/3.4.4/spring-boot-actuator-3.4.4.jar:/home/runner/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.18.3/jackson-datatype-jsr310-2.18.3.jar:/home/runner/.m2/repository/io/micrometer/micrometer-observation/1.14.5/micrometer-observation-1.14.5.jar:/home/runner/.m2/repository/io/micrometer/micrometer-commons/1.14.5/micrometer-commons-1.14.5.jar:/home/runner/.m2/repository/io/micrometer/micrometer-jakarta9/1.14.5/micrometer-jakarta9-1.14.5.jar:/home/runner/.m2/repository/io/micrometer/micrometer-core/1.14.5/micrometer-core-1.14.5.jar:/home/runner/.m2/repository/org/hdrhistogram/HdrHistogram/2.2.2/HdrHistogram-2.2.2.jar:/home/runner/.m2/repository/org/latencyutils/LatencyUtils/2.0.3/LatencyUtils-2.0.3.jar:/home/runner/.m2/repository/org/apache/kafka/kafka-clients/3.9.0/kafka-clients-3.9.0.jar:/home/runner/.m2/repository/com/github/luben/zstd-jni/1.5.6-4/zstd-jni-1.5.6-4.jar:/home/runner/.m2/repository/org/lz4/lz4-java/1.8.0/lz4-java-1.8.0.jar:/home/runner/.m2/repository/org/xerial/snappy/snappy-java/1.1.10.5/snappy-java-1.1.10.5.jar:/home/runner/.m2/repository/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar:/home/runner/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.18.3/jackson-databind-2.18.3.jar:/home/runner/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.18.3/jackson-annotations-2.18.3.jar:/home/runner/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.18.3/jackson-core-2.18.3.jar:/home/runner/.m2/repository/org/postgresql/postgresql/42.7.5/postgresql-42.7.5.jar:/home/runner/.m2/repository/org/checkerframework/checker-qual/3.48.3/checker-qual-3.48.3.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-test/3.4.4/spring-boot-starter-test-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-test/3.4.4/spring-boot-test-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-test-autoconfigure/3.4.4/spring-boot-test-autoconfigure-3.4.4.jar:/home/runner/.m2/repository/com/jayway/jsonpath/json-path/2.9.0/json-path-2.9.0.jar:/home/runner/.m2/repository/jakarta/xml/bind/jakarta.xml.bind-api/4.0.2/jakarta.xml.bind-api-4.0.2.jar:/home/runner/.m2/repository/jakarta/activation/jakarta.activation-api/2.1.3/jakarta.activation-api-2.1.3.jar:/home/runner/.m2/repository/net/minidev/json-smart/2.5.2/json-smart-2.5.2.jar:/home/runner/.m2/repository/net/minidev/accessors-smart/2.5.2/accessors-smart-2.5.2.jar:/home/runner/.m2/repository/org/ow2/asm/asm/9.7.1/asm-9.7.1.jar:/home/runner/.m2/repository/org/assertj/assertj-core/3.26.3/assertj-core-3.26.3.jar:/home/runner/.m2/repository/net/bytebuddy/byte-buddy/1.15.11/byte-buddy-1.15.11.jar:/home/runner/.m2/repository/org/awaitility/awaitility/4.2.2/awaitility-4.2.2.jar:/home/runner/.m2/repository/org/hamcrest/hamcrest/2.2/hamcrest-2.2.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.4/junit-jupiter-5.11.4.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.4/junit-jupiter-api-5.11.4.jar:/home/runner/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/runner/.m2/repository/org/junit/platform/junit-platform-commons/1.11.4/junit-platform-commons-1.11.4.jar:/home/runner/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.4/junit-jupiter-params-5.11.4.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.4/junit-jupiter-engine-5.11.4.jar:/home/runner/.m2/repository/org/junit/platform/junit-platform-engine/1.11.4/junit-platform-engine-1.11.4.jar:/home/runner/.m2/repository/org/mockito/mockito-core/5.14.2/mockito-core-5.14.2.jar:/home/runner/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar:/home/runner/.m2/repository/org/objenesis/objenesis/3.3/objenesis-3.3.jar:/home/runner/.m2/repository/org/mockito/mockito-junit-jupiter/5.14.2/mockito-junit-jupiter-5.14.2.jar:/home/runner/.m2/repository/org/skyscreamer/jsonassert/1.5.3/jsonassert-1.5.3.jar:/home/runner/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar:/home/runner/.m2/repository/org/springframework/spring-core/6.2.5/spring-core-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-jcl/6.2.5/spring-jcl-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-test/6.2.5/spring-test-6.2.5.jar:/home/runner/.m2/repository/org/xmlunit/xmlunit-core/2.10.0/xmlunit-core-2.10.0.jar:/home/runner/.m2/repository/org/testcontainers/junit-jupiter/1.20.6/junit-jupiter-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/testcontainers/1.20.6/testcontainers-1.20.6.jar:/home/runner/.m2/repository/junit/junit/4.13.2/junit-4.13.2.jar:/home/runner/.m2/repository/org/hamcrest/hamcrest-core/2.2/hamcrest-core-2.2.jar:/home/runner/.m2/repository/org/apache/commons/commons-compress/1.24.0/commons-compress-1.24.0.jar:/home/runner/.m2/repository/org/rnorth/duct-tape/duct-tape/1.0.8/duct-tape-1.0.8.jar:/home/runner/.m2/repository/org/jetbrains/annotations/17.0.0/annotations-17.0.0.jar:/home/runner/.m2/repository/com/github/docker-java/docker-java-api/3.4.1/docker-java-api-3.4.1.jar:/home/runner/.m2/repository/com/github/docker-java/docker-java-transport-zerodep/3.4.1/docker-java-transport-zerodep-3.4.1.jar:/home/runner/.m2/repository/com/github/docker-java/docker-java-transport/3.4.1/docker-java-transport-3.4.1.jar:/home/runner/.m2/repository/net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar:/home/runner/.m2/repository/org/testcontainers/postgresql/1.20.6/postgresql-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/jdbc/1.20.6/jdbc-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/database-commons/1.20.6/database-commons-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/kafka/1.20.6/kafka-1.20.6.jar:"/>
+    <property name="java.vm.vendor" value="Eclipse Adoptium"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.vendor.url" value="https://adoptium.net/"/>
+    <property name="user.timezone" value="Etc/UTC"/>
+    <property name="os.name" value="Linux"/>
+    <property name="java.vm.specification.version" value="25"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="sun.boot.library.path" value="/usr/lib/jvm/temurin-25-jdk-amd64/lib"/>
+    <property name="sun.java.command" value="/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/surefire/surefirebooter-20260411101122803_3.jar /home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/surefire 2026-04-11T10-11-22_721-jvmRun1 surefire-20260411101122803_1tmp surefire_0-20260411101122803_2tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/test-classes:/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/classes:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-jdbc/3.4.4/spring-boot-starter-jdbc-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter/3.4.4/spring-boot-starter-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot/3.4.4/spring-boot-3.4.4.jar:/home/runner/.m2/repository/org/springframework/spring-context/6.2.5/spring-context-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-aop/6.2.5/spring-aop-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-expression/6.2.5/spring-expression-6.2.5.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-autoconfigure/3.4.4/spring-boot-autoconfigure-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-logging/3.4.4/spring-boot-starter-logging-3.4.4.jar:/home/runner/.m2/repository/ch/qos/logback/logback-classic/1.5.18/logback-classic-1.5.18.jar:/home/runner/.m2/repository/ch/qos/logback/logback-core/1.5.18/logback-core-1.5.18.jar:/home/runner/.m2/repository/org/apache/logging/log4j/log4j-to-slf4j/2.24.3/log4j-to-slf4j-2.24.3.jar:/home/runner/.m2/repository/org/apache/logging/log4j/log4j-api/2.24.3/log4j-api-2.24.3.jar:/home/runner/.m2/repository/org/slf4j/jul-to-slf4j/2.0.17/jul-to-slf4j-2.0.17.jar:/home/runner/.m2/repository/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1.jar:/home/runner/.m2/repository/org/yaml/snakeyaml/2.3/snakeyaml-2.3.jar:/home/runner/.m2/repository/com/zaxxer/HikariCP/5.1.0/HikariCP-5.1.0.jar:/home/runner/.m2/repository/org/springframework/spring-jdbc/6.2.5/spring-jdbc-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-beans/6.2.5/spring-beans-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-tx/6.2.5/spring-tx-6.2.5.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-actuator/3.4.4/spring-boot-starter-actuator-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-actuator-autoconfigure/3.4.4/spring-boot-actuator-autoconfigure-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-actuator/3.4.4/spring-boot-actuator-3.4.4.jar:/home/runner/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.18.3/jackson-datatype-jsr310-2.18.3.jar:/home/runner/.m2/repository/io/micrometer/micrometer-observation/1.14.5/micrometer-observation-1.14.5.jar:/home/runner/.m2/repository/io/micrometer/micrometer-commons/1.14.5/micrometer-commons-1.14.5.jar:/home/runner/.m2/repository/io/micrometer/micrometer-jakarta9/1.14.5/micrometer-jakarta9-1.14.5.jar:/home/runner/.m2/repository/io/micrometer/micrometer-core/1.14.5/micrometer-core-1.14.5.jar:/home/runner/.m2/repository/org/hdrhistogram/HdrHistogram/2.2.2/HdrHistogram-2.2.2.jar:/home/runner/.m2/repository/org/latencyutils/LatencyUtils/2.0.3/LatencyUtils-2.0.3.jar:/home/runner/.m2/repository/org/apache/kafka/kafka-clients/3.9.0/kafka-clients-3.9.0.jar:/home/runner/.m2/repository/com/github/luben/zstd-jni/1.5.6-4/zstd-jni-1.5.6-4.jar:/home/runner/.m2/repository/org/lz4/lz4-java/1.8.0/lz4-java-1.8.0.jar:/home/runner/.m2/repository/org/xerial/snappy/snappy-java/1.1.10.5/snappy-java-1.1.10.5.jar:/home/runner/.m2/repository/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar:/home/runner/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.18.3/jackson-databind-2.18.3.jar:/home/runner/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.18.3/jackson-annotations-2.18.3.jar:/home/runner/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.18.3/jackson-core-2.18.3.jar:/home/runner/.m2/repository/org/postgresql/postgresql/42.7.5/postgresql-42.7.5.jar:/home/runner/.m2/repository/org/checkerframework/checker-qual/3.48.3/checker-qual-3.48.3.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-starter-test/3.4.4/spring-boot-starter-test-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-test/3.4.4/spring-boot-test-3.4.4.jar:/home/runner/.m2/repository/org/springframework/boot/spring-boot-test-autoconfigure/3.4.4/spring-boot-test-autoconfigure-3.4.4.jar:/home/runner/.m2/repository/com/jayway/jsonpath/json-path/2.9.0/json-path-2.9.0.jar:/home/runner/.m2/repository/jakarta/xml/bind/jakarta.xml.bind-api/4.0.2/jakarta.xml.bind-api-4.0.2.jar:/home/runner/.m2/repository/jakarta/activation/jakarta.activation-api/2.1.3/jakarta.activation-api-2.1.3.jar:/home/runner/.m2/repository/net/minidev/json-smart/2.5.2/json-smart-2.5.2.jar:/home/runner/.m2/repository/net/minidev/accessors-smart/2.5.2/accessors-smart-2.5.2.jar:/home/runner/.m2/repository/org/ow2/asm/asm/9.7.1/asm-9.7.1.jar:/home/runner/.m2/repository/org/assertj/assertj-core/3.26.3/assertj-core-3.26.3.jar:/home/runner/.m2/repository/net/bytebuddy/byte-buddy/1.15.11/byte-buddy-1.15.11.jar:/home/runner/.m2/repository/org/awaitility/awaitility/4.2.2/awaitility-4.2.2.jar:/home/runner/.m2/repository/org/hamcrest/hamcrest/2.2/hamcrest-2.2.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter/5.11.4/junit-jupiter-5.11.4.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.11.4/junit-jupiter-api-5.11.4.jar:/home/runner/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/runner/.m2/repository/org/junit/platform/junit-platform-commons/1.11.4/junit-platform-commons-1.11.4.jar:/home/runner/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.11.4/junit-jupiter-params-5.11.4.jar:/home/runner/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.11.4/junit-jupiter-engine-5.11.4.jar:/home/runner/.m2/repository/org/junit/platform/junit-platform-engine/1.11.4/junit-platform-engine-1.11.4.jar:/home/runner/.m2/repository/org/mockito/mockito-core/5.14.2/mockito-core-5.14.2.jar:/home/runner/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar:/home/runner/.m2/repository/org/objenesis/objenesis/3.3/objenesis-3.3.jar:/home/runner/.m2/repository/org/mockito/mockito-junit-jupiter/5.14.2/mockito-junit-jupiter-5.14.2.jar:/home/runner/.m2/repository/org/skyscreamer/jsonassert/1.5.3/jsonassert-1.5.3.jar:/home/runner/.m2/repository/com/vaadin/external/google/android-json/0.0.20131108.vaadin1/android-json-0.0.20131108.vaadin1.jar:/home/runner/.m2/repository/org/springframework/spring-core/6.2.5/spring-core-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-jcl/6.2.5/spring-jcl-6.2.5.jar:/home/runner/.m2/repository/org/springframework/spring-test/6.2.5/spring-test-6.2.5.jar:/home/runner/.m2/repository/org/xmlunit/xmlunit-core/2.10.0/xmlunit-core-2.10.0.jar:/home/runner/.m2/repository/org/testcontainers/junit-jupiter/1.20.6/junit-jupiter-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/testcontainers/1.20.6/testcontainers-1.20.6.jar:/home/runner/.m2/repository/junit/junit/4.13.2/junit-4.13.2.jar:/home/runner/.m2/repository/org/hamcrest/hamcrest-core/2.2/hamcrest-core-2.2.jar:/home/runner/.m2/repository/org/apache/commons/commons-compress/1.24.0/commons-compress-1.24.0.jar:/home/runner/.m2/repository/org/rnorth/duct-tape/duct-tape/1.0.8/duct-tape-1.0.8.jar:/home/runner/.m2/repository/org/jetbrains/annotations/17.0.0/annotations-17.0.0.jar:/home/runner/.m2/repository/com/github/docker-java/docker-java-api/3.4.1/docker-java-api-3.4.1.jar:/home/runner/.m2/repository/com/github/docker-java/docker-java-transport-zerodep/3.4.1/docker-java-transport-zerodep-3.4.1.jar:/home/runner/.m2/repository/com/github/docker-java/docker-java-transport/3.4.1/docker-java-transport-3.4.1.jar:/home/runner/.m2/repository/net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar:/home/runner/.m2/repository/org/testcontainers/postgresql/1.20.6/postgresql-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/jdbc/1.20.6/jdbc-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/database-commons/1.20.6/database-commons-1.20.6.jar:/home/runner/.m2/repository/org/testcontainers/kafka/1.20.6/kafka-1.20.6.jar:"/>
+    <property name="test" value="OutboxIntegrationTest"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="/home/runner"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2026-01-20"/>
+    <property name="java.home" value="/usr/lib/jvm/temurin-25-jdk-amd64"/>
+    <property name="file.separator" value="/"/>
+    <property name="basedir" value="/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="FILE_LOG_CHARSET" value="UTF-8"/>
+    <property name="java.awt.headless" value="true"/>
+    <property name="surefire.real.class.path" value="/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter/target/surefire/surefirebooter-20260411101122803_3.jar"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="25.0.2+10-LTS"/>
+    <property name="user.name" value="runner"/>
+    <property name="stdout.encoding" value="UTF-8"/>
+    <property name="path.separator" value=":"/>
+    <property name="os.version" value="6.17.0-1010-azure"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="surefire.failIfNoSpecifiedTests" value="false"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Temurin-25.0.2+10"/>
+    <property name="localRepository" value="/home/runner/.m2/repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/adoptium/adoptium-support/issues"/>
+    <property name="java.io.tmpdir" value="/tmp"/>
+    <property name="com.zaxxer.hikari.pool_number" value="1"/>
+    <property name="java.version" value="25.0.2"/>
+    <property name="user.dir" value="/home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="PID" value="7747"/>
+    <property name="CONSOLE_LOG_CHARSET" value="UTF-8"/>
+    <property name="native.encoding" value="UTF-8"/>
+    <property name="java.library.path" value="/usr/java/packages/lib:/usr/lib64:/lib64:/lib:/usr/lib"/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="UTF-8"/>
+    <property name="java.vendor" value="Eclipse Adoptium"/>
+    <property name="java.vm.version" value="25.0.2+10-LTS"/>
+    <property name="stdin.encoding" value="UTF-8"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="69.0"/>
+  </properties>
+  <testcase name="shouldProcessLargeBatchInMultipleCycles" classname="com.github.knibel.outbox.integration.OutboxIntegrationTest" time="12.132">
+    <failure message="&#10;Expected size: 25 but was: 0 in:&#10;[]" type="java.lang.AssertionError"><![CDATA[java.lang.AssertionError: 
+
+Expected size: 25 but was: 0 in:
+[]
+	at com.github.knibel.outbox.integration.OutboxIntegrationTest.shouldProcessLargeBatchInMultipleCycles(OutboxIntegrationTest.java:210)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+]]></failure>
+    <system-out><![CDATA[10:11:23.608 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+10:11:23.611 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+10:11:23.634 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.20.6
+10:11:23.825 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+10:11:24.014 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+10:11:24.015 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+10:11:24.036 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 28.0.4
+  API Version: 1.48
+  Operating System: Ubuntu 24.04.4 LTS
+  Total Memory: 15989 MB
+10:11:24.059 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Creating container for image: testcontainers/ryuk:0.11.0
+10:11:24.155 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Container testcontainers/ryuk:0.11.0 is starting: 0d2463d9516746b33b35098bee6c07bcca773f9cf2ce781cf5d8714bd9c942f5
+10:11:24.413 [main] INFO tc.testcontainers/ryuk:0.11.0 -- Container testcontainers/ryuk:0.11.0 started in PT0.353886217S
+10:11:24.417 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+10:11:24.417 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+10:11:24.418 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+10:11:24.418 [main] INFO tc.confluentinc/cp-kafka:7.6.0 -- Creating container for image: confluentinc/cp-kafka:7.6.0
+10:11:24.434 [main] INFO tc.confluentinc/cp-kafka:7.6.0 -- Container confluentinc/cp-kafka:7.6.0 is starting: 0129a8d9f2d221aa1870ce45635e743b4523e565dc875e137e8fd0023bcc1eff
+10:11:29.332 [main] INFO tc.confluentinc/cp-kafka:7.6.0 -- Container confluentinc/cp-kafka:7.6.0 started in PT4.914064492S
+10:11:29.333 [main] INFO tc.postgres:16-alpine -- Creating container for image: postgres:16-alpine
+10:11:29.372 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine is starting: ebea165c36a0f588e49edac7614d46857bae2c7971f47ce581ae245b29685a3d
+10:11:30.858 [main] INFO tc.postgres:16-alpine -- Container postgres:16-alpine started in PT1.525007534S
+10:11:30.859 [main] INFO tc.postgres:16-alpine -- Container is started (JDBC URL: jdbc:postgresql://localhost:32783/outbox_test?loggerLevel=OFF)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.4)
+
+2026-04-11T10:11:31.190Z  INFO 7747 --- [           main] c.g.k.o.i.OutboxIntegrationTest          : Starting OutboxIntegrationTest using Java 25.0.2 with PID 7747 (started by runner in /home/runner/work/sql-outbox-kafka-adapter/sql-outbox-kafka-adapter)
+2026-04-11T10:11:31.192Z  INFO 7747 --- [           main] c.g.k.o.i.OutboxIntegrationTest          : No active profile set, falling back to 1 default profile: "default"
+2026-04-11T10:11:32.200Z  INFO 7747 --- [           main] o.a.k.clients.producer.ProducerConfig    : ProducerConfig values: 
+	acks = -1
+	auto.include.jmx.reporter = true
+	batch.size = 16384
+	bootstrap.servers = [PLAINTEXT://localhost:32782]
+	buffer.memory = 33554432
+	client.dns.lookup = use_all_dns_ips
+	client.id = producer-1
+	compression.gzip.level = -1
+	compression.lz4.level = 9
+	compression.type = none
+	compression.zstd.level = 3
+	connections.max.idle.ms = 540000
+	delivery.timeout.ms = 120000
+	enable.idempotence = true
+	enable.metrics.push = true
+	interceptor.classes = []
+	key.serializer = class org.apache.kafka.common.serialization.StringSerializer
+	linger.ms = 0
+	max.block.ms = 60000
+	max.in.flight.requests.per.connection = 5
+	max.request.size = 1048576
+	metadata.max.age.ms = 300000
+	metadata.max.idle.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partitioner.adaptive.partitioning.enable = true
+	partitioner.availability.timeout.ms = 0
+	partitioner.class = null
+	partitioner.ignore.keys = false
+	receive.buffer.bytes = 32768
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retries = 2147483647
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	transaction.timeout.ms = 60000
+	transactional.id = null
+	value.serializer = class org.apache.kafka.common.serialization.StringSerializer
+
+2026-04-11T10:11:32.221Z  INFO 7747 --- [           main] o.a.k.c.t.i.KafkaMetricsCollector        : initializing Kafka metrics collector
+2026-04-11T10:11:32.313Z  INFO 7747 --- [           main] o.a.k.clients.producer.KafkaProducer     : [Producer clientId=producer-1] Instantiated an idempotent producer.
+2026-04-11T10:11:32.351Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.9.0
+2026-04-11T10:11:32.351Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 84caaa6e9da06435
+2026-04-11T10:11:32.351Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1775902292350
+2026-04-11T10:11:32.667Z  INFO 7747 --- [           main] c.g.k.o.polling.OutboxPollerRegistry     : Started outbox poller for table 'test_outbox' (interval=200ms, batch=10)
+2026-04-11T10:11:32.677Z  INFO 7747 --- [ler-test_outbox] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-04-11T10:11:32.682Z  INFO 7747 --- [           main] c.g.k.o.i.OutboxIntegrationTest          : Started OutboxIntegrationTest in 1.775 seconds (process running for 9.826)
+2026-04-11T10:11:32.841Z  INFO 7747 --- [ad | producer-1] org.apache.kafka.clients.Metadata        : [Producer clientId=producer-1] Cluster ID: Jpgx7i_ZTHmS130kxQctiQ
+2026-04-11T10:11:32.976Z  INFO 7747 --- [ad | producer-1] o.a.k.c.p.internals.TransactionManager   : [Producer clientId=producer-1] ProducerId set to 0 with epoch 0
+2026-04-11T10:11:33.008Z  INFO 7747 --- [ler-test_outbox] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@24d95549
+2026-04-11T10:11:33.011Z  INFO 7747 --- [ler-test_outbox] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-04-11T10:11:33.049Z  WARN 7747 --- [ler-test_outbox] c.g.knibel.outbox.polling.OutboxPoller   : Stuck-row reset failed for table 'test_outbox': PreparedStatementCallback; bad SQL grammar [UPDATE "test_outbox" SET "status" = ? WHERE "status" = ? AND "updated_at" < NOW() - (? * INTERVAL '1 second')]
+2026-04-11T10:11:33.053Z ERROR 7747 --- [ler-test_outbox] c.g.knibel.outbox.polling.OutboxPoller   : Failed to claim batch from table 'test_outbox': PreparedStatementCallback; bad SQL grammar [WITH candidates AS ( SELECT "id", "aggregate_id", "payload", "headers_json" FROM "test_outbox" WHERE "status" = ? ORDER BY "id" LIMIT ? FOR UPDATE SKIP LOCKED) UPDATE "test_outbox" AS t SET "status" = ? FROM candidates AS c WHERE t."id" = c."id" RETURNING t."id", c."aggregate_id", c."payload", c."headers_json"]
+
+org.springframework.jdbc.BadSqlGrammarException: PreparedStatementCallback; bad SQL grammar [WITH candidates AS ( SELECT "id", "aggregate_id", "payload", "headers_json" FROM "test_outbox" WHERE "status" = ? ORDER BY "id" LIMIT ? FOR UPDATE SKIP LOCKED) UPDATE "test_outbox" AS t SET "status" = ? FROM candidates AS c WHERE t."id" = c."id" RETURNING t."id", c."aggregate_id", c."payload", c."headers_json"]
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1556) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:723) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:754) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:767) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:825) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at com.github.knibel.outbox.jdbc.OutboxRepository.claimWithInProgress(OutboxRepository.java:189) ~[classes/:na]
+	at com.github.knibel.outbox.jdbc.OutboxRepository.claimBatch(OutboxRepository.java:76) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:138) ~[spring-tx-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:380) ~[spring-tx-6.2.5.jar:6.2.5]
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119) ~[spring-tx-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:727) ~[spring-aop-6.2.5.jar:6.2.5]
+	at com.github.knibel.outbox.jdbc.OutboxRepository$$SpringCGLIB$$0.claimBatch(<generated>) ~[classes/:na]
+	at com.github.knibel.outbox.polling.OutboxPoller.poll(OutboxPoller.java:80) ~[classes/:na]
+	at com.github.knibel.outbox.polling.OutboxPollerRegistry.runPollerLoop(OutboxPollerRegistry.java:126) ~[classes/:na]
+	at com.github.knibel.outbox.polling.OutboxPollerRegistry.lambda$start$0(OutboxPollerRegistry.java:78) ~[classes/:na]
+	at java.base/java.lang.VirtualThread.run(VirtualThread.java:456) ~[na:na]
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "test_outbox" does not exist
+  Position: 82
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2420) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:372) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:517) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:434) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgPreparedStatement.executeWithFlags(PgPreparedStatement.java:194) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgPreparedStatement.executeQuery(PgPreparedStatement.java:137) ~[postgresql-42.7.5.jar:42.7.5]
+	at com.zaxxer.hikari.pool.ProxyPreparedStatement.executeQuery(ProxyPreparedStatement.java:52) ~[HikariCP-5.1.0.jar:na]
+	at com.zaxxer.hikari.pool.HikariProxyPreparedStatement.executeQuery(HikariProxyPreparedStatement.java) ~[HikariCP-5.1.0.jar:na]
+	at org.springframework.jdbc.core.JdbcTemplate$1.doInPreparedStatement(JdbcTemplate.java:732) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	... 22 common frames omitted
+
+2026-04-11T10:11:33.262Z  WARN 7747 --- [ler-test_outbox] c.g.knibel.outbox.polling.OutboxPoller   : Stuck-row reset failed for table 'test_outbox': PreparedStatementCallback; bad SQL grammar [UPDATE "test_outbox" SET "status" = ? WHERE "status" = ? AND "updated_at" < NOW() - (? * INTERVAL '1 second')]
+2026-04-11T10:11:33.265Z ERROR 7747 --- [ler-test_outbox] c.g.knibel.outbox.polling.OutboxPoller   : Failed to claim batch from table 'test_outbox': PreparedStatementCallback; bad SQL grammar [WITH candidates AS ( SELECT "id", "aggregate_id", "payload", "headers_json" FROM "test_outbox" WHERE "status" = ? ORDER BY "id" LIMIT ? FOR UPDATE SKIP LOCKED) UPDATE "test_outbox" AS t SET "status" = ? FROM candidates AS c WHERE t."id" = c."id" RETURNING t."id", c."aggregate_id", c."payload", c."headers_json"]
+
+org.springframework.jdbc.BadSqlGrammarException: PreparedStatementCallback; bad SQL grammar [WITH candidates AS ( SELECT "id", "aggregate_id", "payload", "headers_json" FROM "test_outbox" WHERE "status" = ? ORDER BY "id" LIMIT ? FOR UPDATE SKIP LOCKED) UPDATE "test_outbox" AS t SET "status" = ? FROM candidates AS c WHERE t."id" = c."id" RETURNING t."id", c."aggregate_id", c."payload", c."headers_json"]
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1556) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:677) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:723) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:754) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:767) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:825) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at com.github.knibel.outbox.jdbc.OutboxRepository.claimWithInProgress(OutboxRepository.java:189) ~[classes/:na]
+	at com.github.knibel.outbox.jdbc.OutboxRepository.claimBatch(OutboxRepository.java:76) ~[classes/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:196) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:138) ~[spring-tx-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:380) ~[spring-tx-6.2.5.jar:6.2.5]
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119) ~[spring-tx-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:184) ~[spring-aop-6.2.5.jar:6.2.5]
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:727) ~[spring-aop-6.2.5.jar:6.2.5]
+	at com.github.knibel.outbox.jdbc.OutboxRepository$$SpringCGLIB$$0.claimBatch(<generated>) ~[classes/:na]
+	at com.github.knibel.outbox.polling.OutboxPoller.poll(OutboxPoller.java:80) ~[classes/:na]
+	at com.github.knibel.outbox.polling.OutboxPollerRegistry.runPollerLoop(OutboxPollerRegistry.java:126) ~[classes/:na]
+	at com.github.knibel.outbox.polling.OutboxPollerRegistry.lambda$start$0(OutboxPollerRegistry.java:78) ~[classes/:na]
+	at java.base/java.lang.VirtualThread.run(VirtualThread.java:456) ~[na:na]
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "test_outbox" does not exist
+  Position: 82
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2733) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2420) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:372) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:517) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:434) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgPreparedStatement.executeWithFlags(PgPreparedStatement.java:194) ~[postgresql-42.7.5.jar:42.7.5]
+	at org.postgresql.jdbc.PgPreparedStatement.executeQuery(PgPreparedStatement.java:137) ~[postgresql-42.7.5.jar:42.7.5]
+	at com.zaxxer.hikari.pool.ProxyPreparedStatement.executeQuery(ProxyPreparedStatement.java:52) ~[HikariCP-5.1.0.jar:na]
+	at com.zaxxer.hikari.pool.HikariProxyPreparedStatement.executeQuery(HikariProxyPreparedStatement.java) ~[HikariCP-5.1.0.jar:na]
+	at org.springframework.jdbc.core.JdbcTemplate$1.doInPreparedStatement(JdbcTemplate.java:732) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:658) ~[spring-jdbc-6.2.5.jar:6.2.5]
+	... 22 common frames omitted
+
+2026-04-11T10:11:33.428Z  INFO 7747 --- [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [PLAINTEXT://localhost:32782]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = true
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-04-11T10:11:33.443Z  INFO 7747 --- [           main] o.a.k.c.t.i.KafkaMetricsCollector        : initializing Kafka metrics collector
+2026-04-11T10:11:33.488Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.9.0
+2026-04-11T10:11:33.488Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 84caaa6e9da06435
+2026-04-11T10:11:33.488Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1775902293488
+2026-04-11T10:11:33.490Z  INFO 7747 --- [           main] o.a.k.c.c.i.ClassicKafkaConsumer         : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Subscribed to topic(s): test-topic
+2026-04-11T10:11:33.543Z  WARN 7747 --- [           main] org.apache.kafka.clients.NetworkClient   : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] The metadata response from the cluster reported a recoverable issue with correlation id 3 : {test-topic=LEADER_NOT_AVAILABLE}
+2026-04-11T10:11:33.543Z  INFO 7747 --- [           main] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Cluster ID: Jpgx7i_ZTHmS130kxQctiQ
+2026-04-11T10:11:33.908Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Discovered group coordinator localhost:32782 (id: 2147483646 rack: null)
+2026-04-11T10:11:33.913Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] (Re-)joining group
+2026-04-11T10:11:33.936Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Request joining group due to: need to re-join with the given member-id: consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1-419ee3c3-3257-4b49-ad38-3e991d65c42b
+2026-04-11T10:11:33.937Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] (Re-)joining group
+2026-04-11T10:11:33.953Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Successfully joined group with generation Generation{generationId=1, memberId='consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1-419ee3c3-3257-4b49-ad38-3e991d65c42b', protocol='range'}
+2026-04-11T10:11:33.960Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Finished assignment for group at generation 1: {consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1-419ee3c3-3257-4b49-ad38-3e991d65c42b=Assignment(partitions=[test-topic-0])}
+2026-04-11T10:11:34.064Z  INFO 7747 --- [25-ab2c651778e1] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Successfully synced group in generation Generation{generationId=1, memberId='consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1-419ee3c3-3257-4b49-ad38-3e991d65c42b', protocol='range'}
+2026-04-11T10:11:34.674Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Notifying assignor about the new Assignment(partitions=[test-topic-0])
+2026-04-11T10:11:34.677Z  INFO 7747 --- [           main] k.c.c.i.ConsumerRebalanceListenerInvoker : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Adding newly assigned partitions: test-topic-0
+2026-04-11T10:11:34.690Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Found no committed offset for partition test-topic-0
+2026-04-11T10:11:34.702Z  INFO 7747 --- [           main] o.a.k.c.c.internals.SubscriptionState    : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Resetting offset for partition test-topic-0 to position FetchPosition{offset=25, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:32782 (id: 1 rack: null)], epoch=0}}.
+2026-04-11T10:11:44.765Z  INFO 7747 --- [           main] k.c.c.i.ConsumerRebalanceListenerInvoker : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Revoke previously assigned partitions test-topic-0
+2026-04-11T10:11:44.766Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Member consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1-419ee3c3-3257-4b49-ad38-3e991d65c42b sending LeaveGroup request to coordinator localhost:32782 (id: 2147483646 rack: null) due to the consumer is being closed
+2026-04-11T10:11:44.767Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-04-11T10:11:44.767Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1, groupId=outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1] Request joining group due to: consumer pro-actively leaving the group
+2026-04-11T10:11:44.804Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-04-11T10:11:44.804Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-04-11T10:11:44.804Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-04-11T10:11:44.804Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-04-11T10:11:44.813Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-outbox-test-consumer-dfb7df53-a6a6-4930-9925-ab2c651778e1-1 unregistered
+]]></system-out>
+    <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build what is described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/home/runner/.m2/repository/net/bytebuddy/byte-buddy-agent/1.15.11/byte-buddy-agent-1.15.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+  </testcase>
+  <testcase name="shouldResetStuckRowsAndReprocess" classname="com.github.knibel.outbox.integration.OutboxIntegrationTest" time="1.337">
+    <system-out><![CDATA[2026-04-11T10:11:44.841Z  INFO 7747 --- [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [PLAINTEXT://localhost:32782]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = true
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-04-11T10:11:44.842Z  INFO 7747 --- [           main] o.a.k.c.t.i.KafkaMetricsCollector        : initializing Kafka metrics collector
+2026-04-11T10:11:44.849Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.9.0
+2026-04-11T10:11:44.849Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 84caaa6e9da06435
+2026-04-11T10:11:44.849Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1775902304849
+2026-04-11T10:11:44.849Z  INFO 7747 --- [           main] o.a.k.c.c.i.ClassicKafkaConsumer         : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Subscribed to topic(s): test-topic
+2026-04-11T10:11:44.860Z  INFO 7747 --- [           main] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Cluster ID: Jpgx7i_ZTHmS130kxQctiQ
+2026-04-11T10:11:44.861Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Discovered group coordinator localhost:32782 (id: 2147483646 rack: null)
+2026-04-11T10:11:44.868Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] (Re-)joining group
+2026-04-11T10:11:44.873Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Request joining group due to: need to re-join with the given member-id: consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2-b2d137f7-df1c-40c1-80ca-7876da8dbc9b
+2026-04-11T10:11:44.873Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] (Re-)joining group
+2026-04-11T10:11:44.879Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Successfully joined group with generation Generation{generationId=1, memberId='consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2-b2d137f7-df1c-40c1-80ca-7876da8dbc9b', protocol='range'}
+2026-04-11T10:11:44.879Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Finished assignment for group at generation 1: {consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2-b2d137f7-df1c-40c1-80ca-7876da8dbc9b=Assignment(partitions=[test-topic-0])}
+2026-04-11T10:11:44.883Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Successfully synced group in generation Generation{generationId=1, memberId='consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2-b2d137f7-df1c-40c1-80ca-7876da8dbc9b', protocol='range'}
+2026-04-11T10:11:44.883Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Notifying assignor about the new Assignment(partitions=[test-topic-0])
+2026-04-11T10:11:44.883Z  INFO 7747 --- [           main] k.c.c.i.ConsumerRebalanceListenerInvoker : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Adding newly assigned partitions: test-topic-0
+2026-04-11T10:11:44.885Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Found no committed offset for partition test-topic-0
+2026-04-11T10:11:44.891Z  INFO 7747 --- [           main] o.a.k.c.c.internals.SubscriptionState    : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Resetting offset for partition test-topic-0 to position FetchPosition{offset=25, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:32782 (id: 1 rack: null)], epoch=0}}.
+2026-04-11T10:11:45.374Z  WARN 7747 --- [ler-test_outbox] c.g.knibel.outbox.jdbc.OutboxRepository  : Reset 1 stuck row(s) in table 'test_outbox' back to PENDING
+2026-04-11T10:11:45.374Z  WARN 7747 --- [ler-test_outbox] c.g.knibel.outbox.polling.OutboxPoller   : Recovered 1 stuck row(s) in table 'test_outbox'
+2026-04-11T10:11:45.661Z  INFO 7747 --- [           main] k.c.c.i.ConsumerRebalanceListenerInvoker : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Revoke previously assigned partitions test-topic-0
+2026-04-11T10:11:45.661Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Member consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2-b2d137f7-df1c-40c1-80ca-7876da8dbc9b sending LeaveGroup request to coordinator localhost:32782 (id: 2147483646 rack: null) due to the consumer is being closed
+2026-04-11T10:11:45.661Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-04-11T10:11:45.661Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2, groupId=outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2] Request joining group due to: consumer pro-actively leaving the group
+2026-04-11T10:11:46.162Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-04-11T10:11:46.162Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-04-11T10:11:46.163Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-04-11T10:11:46.163Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-04-11T10:11:46.167Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-outbox-test-consumer-d7309bec-3a15-4fbf-9419-eed597a28fc2-2 unregistered
+]]></system-out>
+  </testcase>
+  <testcase name="shouldPublishPendingRowsToKafkaAndMarkThem_done" classname="com.github.knibel.outbox.integration.OutboxIntegrationTest" time="1.234">
+    <system-out><![CDATA[2026-04-11T10:11:46.175Z  INFO 7747 --- [           main] o.a.k.clients.consumer.ConsumerConfig    : ConsumerConfig values: 
+	allow.auto.create.topics = true
+	auto.commit.interval.ms = 5000
+	auto.include.jmx.reporter = true
+	auto.offset.reset = latest
+	bootstrap.servers = [PLAINTEXT://localhost:32782]
+	check.crcs = true
+	client.dns.lookup = use_all_dns_ips
+	client.id = consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3
+	client.rack = 
+	connections.max.idle.ms = 540000
+	default.api.timeout.ms = 60000
+	enable.auto.commit = true
+	enable.metrics.push = true
+	exclude.internal.topics = true
+	fetch.max.bytes = 52428800
+	fetch.max.wait.ms = 500
+	fetch.min.bytes = 1
+	group.id = outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7
+	group.instance.id = null
+	group.protocol = classic
+	group.remote.assignor = null
+	heartbeat.interval.ms = 3000
+	interceptor.classes = []
+	internal.leave.group.on.close = true
+	internal.throw.on.fetch.stable.offset.unsupported = false
+	isolation.level = read_uncommitted
+	key.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+	max.partition.fetch.bytes = 1048576
+	max.poll.interval.ms = 300000
+	max.poll.records = 500
+	metadata.max.age.ms = 300000
+	metadata.recovery.strategy = none
+	metric.reporters = []
+	metrics.num.samples = 2
+	metrics.recording.level = INFO
+	metrics.sample.window.ms = 30000
+	partition.assignment.strategy = [class org.apache.kafka.clients.consumer.RangeAssignor, class org.apache.kafka.clients.consumer.CooperativeStickyAssignor]
+	receive.buffer.bytes = 65536
+	reconnect.backoff.max.ms = 1000
+	reconnect.backoff.ms = 50
+	request.timeout.ms = 30000
+	retry.backoff.max.ms = 1000
+	retry.backoff.ms = 100
+	sasl.client.callback.handler.class = null
+	sasl.jaas.config = null
+	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+	sasl.kerberos.min.time.before.relogin = 60000
+	sasl.kerberos.service.name = null
+	sasl.kerberos.ticket.renew.jitter = 0.05
+	sasl.kerberos.ticket.renew.window.factor = 0.8
+	sasl.login.callback.handler.class = null
+	sasl.login.class = null
+	sasl.login.connect.timeout.ms = null
+	sasl.login.read.timeout.ms = null
+	sasl.login.refresh.buffer.seconds = 300
+	sasl.login.refresh.min.period.seconds = 60
+	sasl.login.refresh.window.factor = 0.8
+	sasl.login.refresh.window.jitter = 0.05
+	sasl.login.retry.backoff.max.ms = 10000
+	sasl.login.retry.backoff.ms = 100
+	sasl.mechanism = GSSAPI
+	sasl.oauthbearer.clock.skew.seconds = 30
+	sasl.oauthbearer.expected.audience = null
+	sasl.oauthbearer.expected.issuer = null
+	sasl.oauthbearer.header.urlencode = false
+	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+	sasl.oauthbearer.jwks.endpoint.url = null
+	sasl.oauthbearer.scope.claim.name = scope
+	sasl.oauthbearer.sub.claim.name = sub
+	sasl.oauthbearer.token.endpoint.url = null
+	security.protocol = PLAINTEXT
+	security.providers = null
+	send.buffer.bytes = 131072
+	session.timeout.ms = 45000
+	socket.connection.setup.timeout.max.ms = 30000
+	socket.connection.setup.timeout.ms = 10000
+	ssl.cipher.suites = null
+	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+	ssl.endpoint.identification.algorithm = https
+	ssl.engine.factory.class = null
+	ssl.key.password = null
+	ssl.keymanager.algorithm = SunX509
+	ssl.keystore.certificate.chain = null
+	ssl.keystore.key = null
+	ssl.keystore.location = null
+	ssl.keystore.password = null
+	ssl.keystore.type = JKS
+	ssl.protocol = TLSv1.3
+	ssl.provider = null
+	ssl.secure.random.implementation = null
+	ssl.trustmanager.algorithm = PKIX
+	ssl.truststore.certificates = null
+	ssl.truststore.location = null
+	ssl.truststore.password = null
+	ssl.truststore.type = JKS
+	value.deserializer = class org.apache.kafka.common.serialization.StringDeserializer
+
+2026-04-11T10:11:46.176Z  INFO 7747 --- [           main] o.a.k.c.t.i.KafkaMetricsCollector        : initializing Kafka metrics collector
+2026-04-11T10:11:46.182Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka version: 3.9.0
+2026-04-11T10:11:46.182Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka commitId: 84caaa6e9da06435
+2026-04-11T10:11:46.182Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : Kafka startTimeMs: 1775902306182
+2026-04-11T10:11:46.182Z  INFO 7747 --- [           main] o.a.k.c.c.i.ClassicKafkaConsumer         : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Subscribed to topic(s): test-topic
+2026-04-11T10:11:46.188Z  INFO 7747 --- [           main] org.apache.kafka.clients.Metadata        : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Cluster ID: Jpgx7i_ZTHmS130kxQctiQ
+2026-04-11T10:11:46.189Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Discovered group coordinator localhost:32782 (id: 2147483646 rack: null)
+2026-04-11T10:11:46.191Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] (Re-)joining group
+2026-04-11T10:11:46.195Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Request joining group due to: need to re-join with the given member-id: consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3-df8b1ba8-1117-4a99-8728-7341e4d8d506
+2026-04-11T10:11:46.195Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] (Re-)joining group
+2026-04-11T10:11:46.199Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Successfully joined group with generation Generation{generationId=1, memberId='consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3-df8b1ba8-1117-4a99-8728-7341e4d8d506', protocol='range'}
+2026-04-11T10:11:46.200Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Finished assignment for group at generation 1: {consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3-df8b1ba8-1117-4a99-8728-7341e4d8d506=Assignment(partitions=[test-topic-0])}
+2026-04-11T10:11:46.203Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Successfully synced group in generation Generation{generationId=1, memberId='consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3-df8b1ba8-1117-4a99-8728-7341e4d8d506', protocol='range'}
+2026-04-11T10:11:46.203Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Notifying assignor about the new Assignment(partitions=[test-topic-0])
+2026-04-11T10:11:46.203Z  INFO 7747 --- [           main] k.c.c.i.ConsumerRebalanceListenerInvoker : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Adding newly assigned partitions: test-topic-0
+2026-04-11T10:11:46.205Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Found no committed offset for partition test-topic-0
+2026-04-11T10:11:46.209Z  INFO 7747 --- [           main] o.a.k.c.c.internals.SubscriptionState    : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Resetting offset for partition test-topic-0 to position FetchPosition{offset=26, offsetEpoch=Optional.empty, currentLeader=LeaderAndEpoch{leader=Optional[localhost:32782 (id: 1 rack: null)], epoch=0}}.
+2026-04-11T10:11:46.898Z  INFO 7747 --- [           main] k.c.c.i.ConsumerRebalanceListenerInvoker : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Revoke previously assigned partitions test-topic-0
+2026-04-11T10:11:46.898Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Member consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3-df8b1ba8-1117-4a99-8728-7341e4d8d506 sending LeaveGroup request to coordinator localhost:32782 (id: 2147483646 rack: null) due to the consumer is being closed
+2026-04-11T10:11:46.899Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Resetting generation and member id due to: consumer pro-actively leaving the group
+2026-04-11T10:11:46.899Z  INFO 7747 --- [           main] o.a.k.c.c.internals.ConsumerCoordinator  : [Consumer clientId=consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3, groupId=outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7] Request joining group due to: consumer pro-actively leaving the group
+2026-04-11T10:11:47.397Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Metrics scheduler closed
+2026-04-11T10:11:47.397Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.metrics.JmxReporter
+2026-04-11T10:11:47.397Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Closing reporter org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter
+2026-04-11T10:11:47.397Z  INFO 7747 --- [           main] o.apache.kafka.common.metrics.Metrics    : Metrics reporters closed
+2026-04-11T10:11:47.401Z  INFO 7747 --- [           main] o.a.kafka.common.utils.AppInfoParser     : App info kafka.consumer for consumer-outbox-test-consumer-2fb1ceaa-4b5e-4172-92cb-14ddb2e61ac7-3 unregistered
+]]></system-out>
+  </testcase>
+</testsuite>

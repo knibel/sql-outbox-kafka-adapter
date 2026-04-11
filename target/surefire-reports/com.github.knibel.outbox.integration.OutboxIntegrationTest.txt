@@ -1,0 +1,14 @@
+-------------------------------------------------------------------------------
+Test set: com.github.knibel.outbox.integration.OutboxIntegrationTest
+-------------------------------------------------------------------------------
+Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 24.43 s <<< FAILURE! -- in com.github.knibel.outbox.integration.OutboxIntegrationTest
+com.github.knibel.outbox.integration.OutboxIntegrationTest.shouldProcessLargeBatchInMultipleCycles -- Time elapsed: 12.13 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expected size: 25 but was: 0 in:
+[]
+	at com.github.knibel.outbox.integration.OutboxIntegrationTest.shouldProcessLargeBatchInMultipleCycles(OutboxIntegrationTest.java:210)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+

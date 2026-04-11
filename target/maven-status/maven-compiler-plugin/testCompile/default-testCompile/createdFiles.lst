@@ -1,0 +1,5 @@
+com/github/knibel/outbox/domain/TimestampStatusStrategyTest.class
+com/github/knibel/outbox/jdbc/SqlIdentifierTest.class
+com/github/knibel/outbox/integration/OutboxIntegrationTest.class
+com/github/knibel/outbox/domain/BooleanStatusStrategyTest.class
+com/github/knibel/outbox/domain/EnumStatusStrategyTest.class
