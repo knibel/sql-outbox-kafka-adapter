@@ -2,6 +2,7 @@ package com.github.knibel.outbox.polling;
 
 import com.github.knibel.outbox.config.OutboxProperties;
 import com.github.knibel.outbox.config.OutboxTableProperties;
+import com.github.knibel.outbox.config.RowMappingStrategy;
 import com.github.knibel.outbox.jdbc.OutboxRepository;
 import com.github.knibel.outbox.jdbc.SqlIdentifier;
 import com.github.knibel.outbox.kafka.OutboxKafkaProducer;
@@ -166,10 +167,32 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             SqlIdentifier.quote(cfg.getTableName());
             SqlIdentifier.quote(cfg.getIdColumn());
             SqlIdentifier.quote(cfg.getStatusColumn());
-            SqlIdentifier.quote(cfg.getPayloadColumn());
             if (cfg.getKeyColumn() != null)     SqlIdentifier.quote(cfg.getKeyColumn());
             if (cfg.getTopicColumn() != null)   SqlIdentifier.quote(cfg.getTopicColumn());
             if (cfg.getHeadersColumn() != null) SqlIdentifier.quote(cfg.getHeadersColumn());
+
+            // Validate payloadColumn only when the PAYLOAD_COLUMN strategy is used
+            RowMappingStrategy rowMapping = cfg.getRowMappingStrategy();
+            if (rowMapping == RowMappingStrategy.PAYLOAD_COLUMN) {
+                SqlIdentifier.quote(cfg.getPayloadColumn());
+            }
+
+            // Validate CUSTOM strategy: fieldMappings must not be empty and
+            // all source column names must be safe SQL identifiers
+            if (rowMapping == RowMappingStrategy.CUSTOM) {
+                if (cfg.getFieldMappings() == null || cfg.getFieldMappings().isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "Table '" + name + "': rowMappingStrategy=CUSTOM requires non-empty 'fieldMappings'");
+                }
+                for (var entry : cfg.getFieldMappings().entrySet()) {
+                    SqlIdentifier.quote(entry.getKey());
+                    if (entry.getValue() == null || entry.getValue().isBlank()) {
+                        throw new IllegalArgumentException(
+                                "Table '" + name + "': fieldMappings value for column '"
+                                + entry.getKey() + "' must not be blank");
+                    }
+                }
+            }
 
             if (cfg.getTopicColumn() == null
                     && (cfg.getStaticTopic() == null || cfg.getStaticTopic().isBlank())) {
