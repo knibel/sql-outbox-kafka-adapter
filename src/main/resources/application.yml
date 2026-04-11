@@ -126,6 +126,28 @@ outbox:
       # Column into which NOW() is written after a row is published.
       # Rows with NULL in this column are treated as pending.
       # processedAtColumn: processed_at
+
+      # ── Row mapping strategy ──────────────────────────────────────────────
+      # How SQL row columns are mapped to the Kafka record value (payload).
+      # Allowed values: PAYLOAD_COLUMN (default), TO_CAMEL_CASE, CUSTOM.
+
+      # PAYLOAD_COLUMN (default): reads the pre-serialized JSON from payloadColumn.
+      # TO_CAMEL_CASE: selects all columns from the row and converts each
+      #   snake_case column name to camelCase in the resulting JSON payload.
+      # CUSTOM: uses the explicit fieldMappings below to map source columns
+      #   to target JSON paths (supports nested objects via dot-separated paths).
+      # rowMappingStrategy: TO_CAMEL_CASE
+
+      # ── CUSTOM strategy settings ──────────────────────────────────────────
+      # Required only when rowMappingStrategy: CUSTOM.
+      # Keys are source SQL column names; values are target JSON field paths.
+      # Dot-separated paths produce nested JSON objects.
+      # Example:
+      #   fieldMappings:
+      #     order_id: orderId
+      #     customer_name: customer.name
+      #     customer_email: customer.email
+      # Produces: {"orderId":"…","customer":{"name":"…","email":"…"}}
 logging:
   level:
     org.apache.kafka.clients: WARN
