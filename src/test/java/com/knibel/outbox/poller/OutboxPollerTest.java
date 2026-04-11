@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
@@ -46,7 +47,7 @@ class OutboxPollerTest {
 
     @Test
     void poll_doesNothingWhenNoMessagesArePending() {
-        when(repository.findPendingMessages(anyInt())).thenReturn(List.of());
+        when(repository.findPendingMessages(any(PageRequest.class))).thenReturn(List.of());
 
         poller.poll();
 
@@ -57,7 +58,7 @@ class OutboxPollerTest {
     void poll_publishesEachPendingMessageToKafka() throws Exception {
         OutboxMessage msg1 = new OutboxMessage("topic-a", "k1", "payload-1");
         OutboxMessage msg2 = new OutboxMessage("topic-b", "k2", "payload-2");
-        when(repository.findPendingMessages(anyInt())).thenReturn(List.of(msg1, msg2));
+        when(repository.findPendingMessages(any(PageRequest.class))).thenReturn(List.of(msg1, msg2));
         mockSuccessfulSend("topic-a", "k1", "payload-1");
         mockSuccessfulSend("topic-b", "k2", "payload-2");
 
@@ -70,7 +71,7 @@ class OutboxPollerTest {
     @Test
     void poll_callsStrategyOnSuccessForEachMessage() throws Exception {
         OutboxMessage msg = new OutboxMessage("events", "key", "{\"type\":\"ORDER_CREATED\"}");
-        when(repository.findPendingMessages(anyInt())).thenReturn(List.of(msg));
+        when(repository.findPendingMessages(any(PageRequest.class))).thenReturn(List.of(msg));
         mockSuccessfulSend("events", "key", "{\"type\":\"ORDER_CREATED\"}");
 
         poller.poll();
@@ -81,7 +82,7 @@ class OutboxPollerTest {
     @Test
     void poll_withDeleteStrategy_deletesRowAfterSuccessfulPublish() throws Exception {
         OutboxMessage msg = new OutboxMessage("events", "key", "{}");
-        when(repository.findPendingMessages(anyInt())).thenReturn(List.of(msg));
+        when(repository.findPendingMessages(any(PageRequest.class))).thenReturn(List.of(msg));
         mockSuccessfulSend("events", "key", "{}");
 
         poller.poll();
@@ -94,7 +95,7 @@ class OutboxPollerTest {
     void poll_continuesWithRemainingMessagesWhenOnePublishFails() throws Exception {
         OutboxMessage bad = new OutboxMessage("events", "bad-key", "{}");
         OutboxMessage good = new OutboxMessage("events", "good-key", "{\"ok\":true}");
-        when(repository.findPendingMessages(anyInt())).thenReturn(List.of(bad, good));
+        when(repository.findPendingMessages(any(PageRequest.class))).thenReturn(List.of(bad, good));
 
         CompletableFuture<SendResult<String, String>> failedFuture = new CompletableFuture<>();
         failedFuture.completeExceptionally(new RuntimeException("broker unavailable"));

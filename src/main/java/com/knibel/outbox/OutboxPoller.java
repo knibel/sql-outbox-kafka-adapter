@@ -5,6 +5,7 @@ import com.knibel.outbox.strategy.OutboxProcessingStrategy;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -44,14 +45,15 @@ public class OutboxPoller {
     }
 
     /**
-     * Polling loop. The fixed-delay is set to 1 ms here; the actual interval is driven by
-     * {@code outbox.polling-interval-ms} via a SpEL expression so that it can be changed
-     * in configuration without recompiling.
+     * Polling loop driven by {@code outbox.polling-interval-ms} (default 1000 ms).
+     * The SpEL expression reads the value from the {@link OutboxProperties} bean so the
+     * interval can be changed in configuration without recompiling.
      */
     @Scheduled(fixedDelayString = "#{outboxProperties.pollingIntervalMs}")
     @Transactional
     public void poll() {
-        List<OutboxMessage> messages = repository.findPendingMessages(properties.getBatchSize());
+        List<OutboxMessage> messages = repository.findPendingMessages(
+                PageRequest.of(0, properties.getBatchSize()));
         if (messages.isEmpty()) {
             return;
         }
