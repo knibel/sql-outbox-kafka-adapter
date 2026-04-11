@@ -29,9 +29,12 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code FOR UPDATE SKIP LOCKED} so multiple application instances never
  * process the same row simultaneously.
  *
- * <p><b>Database compatibility:</b> only standard JDBC SQL is used.
- * {@code FOR UPDATE SKIP LOCKED} is the sole non-standard feature and is
- * supported by PostgreSQL 9.5+, MySQL 8.0+, and Oracle 12c+.
+ * <p><b>Database compatibility:</b> only standard ANSI SQL is used.
+ * {@code FETCH FIRST n ROWS ONLY} (ANSI SQL:2008) replaces the
+ * non-standard {@code LIMIT} clause and is supported by PostgreSQL 8.4+
+ * and Oracle 12c+.  {@code CURRENT_TIMESTAMP} is ANSI SQL.
+ * {@code FOR UPDATE SKIP LOCKED} is the sole vendor extension and is
+ * supported by PostgreSQL 9.5+ and Oracle 12c+.
  */
 @Repository
 public class OutboxRepository {
@@ -80,7 +83,7 @@ public class OutboxRepository {
                     + " FROM " + table
                     + " WHERE " + statusCol + " = ?"
                     + " ORDER BY " + idCol
-                    + " LIMIT ?"
+                    + " FETCH FIRST ? ROWS ONLY"
                     + " FOR UPDATE SKIP LOCKED";
             return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
                     config.getPendingValue(), config.getBatchSize());
@@ -91,7 +94,7 @@ public class OutboxRepository {
                     + " FROM " + table
                     + " WHERE " + processedAtCol + " IS NULL"
                     + " ORDER BY " + idCol
-                    + " LIMIT ?"
+                    + " FETCH FIRST ? ROWS ONLY"
                     + " FOR UPDATE SKIP LOCKED";
             return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
                     config.getBatchSize());
@@ -101,7 +104,7 @@ public class OutboxRepository {
             String sql = "SELECT " + selectList
                     + " FROM " + table
                     + " ORDER BY " + idCol
-                    + " LIMIT ?"
+                    + " FETCH FIRST ? ROWS ONLY"
                     + " FOR UPDATE SKIP LOCKED";
             return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
                     config.getBatchSize());
@@ -162,7 +165,7 @@ public class OutboxRepository {
         String processedAtCol = SqlIdentifier.quote(config.getProcessedAtColumn());
 
         String sql = "UPDATE " + table
-                + " SET " + processedAtCol + " = NOW()"
+                + " SET " + processedAtCol + " = CURRENT_TIMESTAMP"
                 + " WHERE " + idCol + " IN (:ids)";
 
         MapSqlParameterSource params = new MapSqlParameterSource()
