@@ -1,0 +1,122 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SQL → Kafka Outbox Adapter – application.yml
+#
+# Copy this file and fill in your values. Every property is documented here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  application:
+    name: sql-outbox-kafka-adapter
+
+  # ── DataSource (HikariCP) ──────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydb
+    username: myuser
+    password: mypassword
+    hikari:
+      # Maximum number of connections in the pool.
+      # Rule of thumb: number of poller threads × 2, minimum 10.
+      maximum-pool-size: 10
+      # Connection timeout (ms). Fail fast rather than queue forever.
+      connection-timeout: 5000
+      # How long a connection can sit idle before being evicted (ms).
+      idle-timeout: 600000
+      # Maximum lifetime of a connection in the pool (ms).
+      max-lifetime: 1800000
+
+# ── Actuator ──────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Outbox configuration
+# ─────────────────────────────────────────────────────────────────────────────
+outbox:
+
+  # ── Kafka producer ──────────────────────────────────────────────────────────
+  kafka:
+    # Comma-separated list of Kafka broker addresses.
+    bootstrap-servers: localhost:9092
+
+    # Optional transactional ID prefix.
+    # When non-empty, the producer uses Kafka transactions for strict
+    # exactly-once semantics across JVM restarts (requires Kafka 2.5+).
+    # Leave blank to use idempotent-only mode (recommended for most cases).
+    transactional-id-prefix: ""
+
+    # Additional KafkaProducer properties forwarded verbatim.
+    # Example:
+    #   producer-properties:
+    #     compression.type: lz4
+    #     linger.ms: 5
+    producer-properties: {}
+
+  # ── Outbox tables ────────────────────────────────────────────────────────────
+  # One entry per outbox table. Multiple tables are polled concurrently,
+  # each in its own virtual thread.
+  #
+  # Each row moves from pendingValue → doneValue in the statusColumn.
+  # Any error during a poll cycle shuts the application down immediately
+  # to preserve message ordering.
+  tables:
+
+    - # Name of the database table to poll. Required.
+      tableName: orders_outbox
+
+      # How often to poll for new rows (milliseconds). Default: 1000.
+      pollIntervalMs: 500
+
+      # Maximum rows per poll cycle. Default: 100.
+      batchSize: 100
+
+      # Primary-key column. Used for ordering, locking, and bulk UPDATEs.
+      # Default: "id".
+      idColumn: id
+
+      # Column whose value becomes the Kafka record key.
+      # When omitted, the value of idColumn is used as the Kafka key.
+      keyColumn: aggregate_id
+
+      # Column containing the JSON payload sent as the Kafka record value.
+      # Default: "payload".
+      payloadColumn: payload
+
+      # Optional column containing a JSON object whose entries become Kafka
+      # record headers. Example value: {"correlation-id": "abc123"}.
+      # Omit or leave null to send no headers.
+      headersColumn: headers_json
+
+      # Column used to route each row to a specific Kafka topic.
+      # When set, every row can target a different topic.
+      # When omitted, staticTopic is used for all rows in this table.
+      topicColumn: kafka_topic
+
+      # Fallback topic when topicColumn is not configured.
+      # Required if topicColumn is not set.
+      staticTopic: orders
+
+      # ── Post-publish strategy ────────────────────────────────────────────────
+      # What to do with a row after it has been successfully published to Kafka.
+      # Options:
+      #   MARK_DONE (default) – update the statusColumn to doneValue.
+      #                          Rows are kept in the table for auditing / replay.
+      #   DELETE              – delete the row immediately after publication.
+      #                          Keeps the table lean; no separate cleanup job needed.
+      processingStrategy: MARK_DONE
+
+      # ── Status tracking (used only when processingStrategy = MARK_DONE) ──────
+      # Column that tracks processing status. Default: "status".
+      statusColumn: status
+
+      # Value that means "not yet processed". Default: "PENDING".
+      pendingValue: PENDING
+
+      # Value that means "successfully published to Kafka". Default: "DONE".
+      doneValue: DONE

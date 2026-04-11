@@ -1,0 +1,26 @@
+# Test application context – overrides default application.yml.
+# The OutboxPollerRegistry needs at least a valid datasource and kafka config
+# to start; table configs are injected per-test via @SpringBootTest(properties).
+spring:
+  datasource:
+    # Will be overridden by @DynamicPropertySource in integration tests
+    url: jdbc:postgresql://localhost:5432/test
+    username: test
+    password: test
+  # Create the test_outbox table before the poller SmartLifecycle starts.
+  # Spring Boot's SQL init runs during context refresh, before SmartLifecycle.start().
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-test.sql
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+outbox:
+  kafka:
+    bootstrap-servers: localhost:9092   # overridden by @DynamicPropertySource
+  tables: []
