@@ -6,3 +6,9 @@ CREATE TABLE IF NOT EXISTS test_outbox (
     status       VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     processed_at TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS skip_delay_outbox (
+    id      VARCHAR(36) PRIMARY KEY,
+    payload TEXT        NOT NULL,
+    status  VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+);
