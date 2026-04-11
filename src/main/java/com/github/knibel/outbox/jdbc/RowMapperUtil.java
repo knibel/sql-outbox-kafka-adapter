@@ -8,6 +8,11 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -113,6 +118,10 @@ public final class RowMapperUtil {
      * placed in the JSON payload.  When {@code dataType} is {@code null},
      * the JDBC driver's default Java mapping is used without conversion.
      *
+     * <p>When a {@link FieldMapping} has non-empty {@code valueMappings},
+     * the raw value is looked up (as a string) in the map and replaced with
+     * the mapped value <em>before</em> any data-type conversion.
+     *
      * @param rs            positioned result-set row
      * @param fieldMappings source-column → {@link FieldMapping} mapping
      * @param objectMapper  Jackson mapper for serialization
@@ -127,10 +136,29 @@ public final class RowMapperUtil {
             String sourceColumn = entry.getKey();
             FieldMapping mapping = entry.getValue();
             Object value = rs.getObject(sourceColumn);
-            Object converted = convertValue(value, mapping.getDataType());
+            Object mapped = applyValueMapping(value, mapping.getValueMappings());
+            Object converted = convertValue(mapped, mapping.getDataType(), mapping.getFormat());
             setNestedValue(root, mapping.getName(), converted);
         }
         return objectMapper.writeValueAsString(root);
+    }
+
+    // ── Value mapping ────────────────────────────────────────────────────────
+
+    /**
+     * Looks up the raw value (as a string) in the given value-mapping table.
+     * If a match is found, returns the mapped string value; otherwise returns
+     * the original value unchanged.  Returns {@code null} values unchanged.
+     */
+    static Object applyValueMapping(Object value, Map<String, String> valueMappings) {
+        if (value == null || valueMappings == null || valueMappings.isEmpty()) {
+            return value;
+        }
+        String key = String.valueOf(value);
+        if (valueMappings.containsKey(key)) {
+            return valueMappings.get(key);
+        }
+        return value;
     }
 
     // ── Type conversion ──────────────────────────────────────────────────────
@@ -139,8 +167,12 @@ public final class RowMapperUtil {
      * Converts the given value to the specified {@link FieldDataType}.
      * Returns the value unchanged when {@code dataType} is {@code null} or
      * when the value itself is {@code null}.
+     *
+     * <p>For {@link FieldDataType#DATE DATE} and
+     * {@link FieldDataType#DATETIME DATETIME}, the {@code format} parameter
+     * specifies the {@link DateTimeFormatter} pattern used for formatting.
      */
-    static Object convertValue(Object value, FieldDataType dataType) {
+    static Object convertValue(Object value, FieldDataType dataType, String format) {
         if (value == null || dataType == null) {
             return value;
         }
@@ -156,7 +188,61 @@ public final class RowMapperUtil {
                     : Boolean.parseBoolean(String.valueOf(value));
             case DECIMAL -> (value instanceof BigDecimal bd) ? bd
                     : new BigDecimal(String.valueOf(value));
+            case DATE     -> formatDate(value, format);
+            case DATETIME -> formatDateTime(value, format);
         };
+    }
+
+    /**
+     * Overload without format – delegates with {@code null} format.
+     */
+    static Object convertValue(Object value, FieldDataType dataType) {
+        return convertValue(value, dataType, null);
+    }
+
+    // ── Date/DateTime formatting ─────────────────────────────────────────────
+
+    /**
+     * Formats a temporal value as a date string using the given pattern.
+     * Supports {@link java.sql.Date}, {@link java.sql.Timestamp},
+     * {@link LocalDate}, {@link LocalDateTime}, and {@link java.util.Date}.
+     */
+    private static String formatDate(Object value, String format) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
+        LocalDate localDate = toLocalDate(value);
+        return formatter.format(localDate);
+    }
+
+    /**
+     * Formats a temporal value as a date-time string using the given pattern.
+     * Supports {@link java.sql.Timestamp}, {@link LocalDateTime},
+     * {@link Instant}, {@link LocalDate}, and {@link java.util.Date}.
+     */
+    private static String formatDateTime(Object value, String format) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
+        LocalDateTime localDateTime = toLocalDateTime(value);
+        return formatter.format(localDateTime);
+    }
+
+    /** Converts various temporal types to {@link LocalDate}. */
+    private static LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate ld)           return ld;
+        if (value instanceof java.sql.Date sd)       return sd.toLocalDate();
+        if (value instanceof java.sql.Timestamp ts)  return ts.toLocalDateTime().toLocalDate();
+        if (value instanceof LocalDateTime ldt)      return ldt.toLocalDate();
+        if (value instanceof java.util.Date d)       return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        throw new IllegalArgumentException("Cannot convert " + value.getClass().getName() + " to LocalDate");
+    }
+
+    /** Converts various temporal types to {@link LocalDateTime}. */
+    private static LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof LocalDateTime ldt)      return ldt;
+        if (value instanceof java.sql.Timestamp ts)  return ts.toLocalDateTime();
+        if (value instanceof Instant inst)           return inst.atZone(ZoneId.systemDefault()).toLocalDateTime();
+        if (value instanceof java.sql.Date sd)       return sd.toLocalDate().atStartOfDay();
+        if (value instanceof LocalDate ld)           return ld.atStartOfDay();
+        if (value instanceof java.util.Date d)       return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        throw new IllegalArgumentException("Cannot convert " + value.getClass().getName() + " to LocalDateTime");
     }
 
     /**

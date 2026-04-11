@@ -143,8 +143,13 @@ outbox:
       # Keys are source SQL column names; values have:
       #   - name: target JSON field path (dot-separated for nesting)
       #   - dataType: (optional) target data type for conversion
-      #     Allowed: STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DECIMAL
+      #     Allowed: STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DECIMAL, DATE, DATETIME
       #     When omitted, the JDBC driver's default Java mapping is used.
+      #   - format: (required for DATE/DATETIME) date-time format pattern
+      #     Examples: "yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm:ss"
+      #   - valueMappings: (optional) maps raw DB values to output values
+      #     Applied before dataType conversion.
+      #     Example: { "1": ACTIVE, "2": INACTIVE }
       # Example:
       #   fieldMappings:
       #     order_id:
@@ -153,11 +158,20 @@ outbox:
       #     total_amount:
       #       name: totalAmount
       #       dataType: DOUBLE
+      #     created_at:
+      #       name: createdAt
+      #       dataType: DATETIME
+      #       format: "yyyy-MM-dd'T'HH:mm:ss"
+      #     status_code:
+      #       name: status
+      #       valueMappings:
+      #         "1": ACTIVE
+      #         "2": INACTIVE
       #     customer_name:
       #       name: customer.name
       #     customer_email:
       #       name: customer.email
-      # Produces: {"orderId":"…","totalAmount":99.95,"customer":{"name":"…","email":"…"}}
+      # Produces: {"orderId":"…","totalAmount":99.95,"createdAt":"2024-01-15T10:30:00","status":"ACTIVE","customer":{"name":"…","email":"…"}}
 logging:
   level:
     org.apache.kafka.clients: WARN

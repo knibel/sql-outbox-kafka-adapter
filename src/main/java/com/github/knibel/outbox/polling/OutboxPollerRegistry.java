@@ -1,5 +1,6 @@
 package com.github.knibel.outbox.polling;
 
+import com.github.knibel.outbox.config.FieldDataType;
 import com.github.knibel.outbox.config.FieldMapping;
 import com.github.knibel.outbox.config.OutboxProperties;
 import com.github.knibel.outbox.config.OutboxTableProperties;
@@ -192,6 +193,15 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                         throw new IllegalArgumentException(
                                 "Table '" + name + "': fieldMappings entry for column '"
                                 + entry.getKey() + "' must have a non-blank 'name'");
+                    }
+                    // DATE and DATETIME require a format pattern
+                    FieldDataType dt = mapping.getDataType();
+                    if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
+                            && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
+                        throw new IllegalArgumentException(
+                                "Table '" + name + "': fieldMappings entry for column '"
+                                + entry.getKey() + "' with dataType=" + dt
+                                + " requires a non-blank 'format' pattern");
                     }
                 }
             }

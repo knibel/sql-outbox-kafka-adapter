@@ -29,5 +29,8 @@ CREATE TABLE IF NOT EXISTS custom_mapping_outbox (
     city            VARCHAR(100),
     total_amount    NUMERIC(10,2),
     is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMP,
+    order_date      DATE,
+    status_code     INTEGER DEFAULT 1,
     status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
 );

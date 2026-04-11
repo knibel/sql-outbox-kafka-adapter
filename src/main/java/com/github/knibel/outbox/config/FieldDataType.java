@@ -27,5 +27,27 @@ public enum FieldDataType {
     BOOLEAN,
 
     /** Convert the value to {@link java.math.BigDecimal}. */
-    DECIMAL
+    DECIMAL,
+
+    /**
+     * Format the value as a date string.
+     * Requires {@link FieldMapping#getFormat() format} to be set
+     * (e.g. {@code "yyyy-MM-dd"}).
+     *
+     * <p>Accepts {@link java.sql.Date}, {@link java.sql.Timestamp},
+     * {@link java.time.LocalDate}, {@link java.time.LocalDateTime},
+     * and {@link java.util.Date}.
+     */
+    DATE,
+
+    /**
+     * Format the value as a date-time string.
+     * Requires {@link FieldMapping#getFormat() format} to be set
+     * (e.g. {@code "yyyy-MM-dd'T'HH:mm:ss"}).
+     *
+     * <p>Accepts {@link java.sql.Timestamp},
+     * {@link java.time.LocalDateTime}, {@link java.time.Instant},
+     * and {@link java.util.Date}.
+     */
+    DATETIME
 }
