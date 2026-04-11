@@ -126,3 +126,6 @@ outbox:
       # Column into which NOW() is written after a row is published.
       # Rows with NULL in this column are treated as pending.
       # processedAtColumn: processed_at
+logging:
+  level:
+    org.apache.kafka.clients: WARN
