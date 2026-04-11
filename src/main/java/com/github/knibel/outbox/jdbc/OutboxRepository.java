@@ -35,6 +35,12 @@ import org.springframework.transaction.annotation.Transactional;
  * and Oracle 12c+.  {@code CURRENT_TIMESTAMP} is ANSI SQL.
  * {@code FOR UPDATE SKIP LOCKED} is the sole vendor extension and is
  * supported by PostgreSQL 9.5+ and Oracle 12c+.
+ *
+ * <p><b>Oracle note:</b> Oracle does not allow {@code FOR UPDATE} on a
+ * query that uses {@code FETCH FIRST} (ORA-02014).  Therefore, the
+ * row-limiting clause is placed inside a subquery that selects only the
+ * primary key, and the outer query joins back to the table with
+ * {@code FOR UPDATE SKIP LOCKED}.
  */
 @Repository
 public class OutboxRepository {
@@ -81,10 +87,12 @@ public class OutboxRepository {
             String statusCol = SqlIdentifier.quote(config.getStatusColumn());
             String sql = "SELECT " + selectList
                     + " FROM " + table
-                    + " WHERE " + statusCol + " = ?"
-                    + " ORDER BY " + idCol
-                    + " FETCH FIRST ? ROWS ONLY"
-                    + " FOR UPDATE SKIP LOCKED";
+                    + " WHERE " + idCol + " IN ("
+                    +   "SELECT " + idCol + " FROM " + table
+                    +   " WHERE " + statusCol + " = ?"
+                    +   " ORDER BY " + idCol
+                    +   " FETCH FIRST ? ROWS ONLY"
+                    + ") FOR UPDATE SKIP LOCKED";
             return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
                     config.getPendingValue(), config.getBatchSize());
 
@@ -92,10 +100,12 @@ public class OutboxRepository {
             String processedAtCol = SqlIdentifier.quote(config.getProcessedAtColumn());
             String sql = "SELECT " + selectList
                     + " FROM " + table
-                    + " WHERE " + processedAtCol + " IS NULL"
-                    + " ORDER BY " + idCol
-                    + " FETCH FIRST ? ROWS ONLY"
-                    + " FOR UPDATE SKIP LOCKED";
+                    + " WHERE " + idCol + " IN ("
+                    +   "SELECT " + idCol + " FROM " + table
+                    +   " WHERE " + processedAtCol + " IS NULL"
+                    +   " ORDER BY " + idCol
+                    +   " FETCH FIRST ? ROWS ONLY"
+                    + ") FOR UPDATE SKIP LOCKED";
             return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
                     config.getBatchSize());
 
@@ -103,9 +113,11 @@ public class OutboxRepository {
             // DELETE strategy: every row present is pending
             String sql = "SELECT " + selectList
                     + " FROM " + table
-                    + " ORDER BY " + idCol
-                    + " FETCH FIRST ? ROWS ONLY"
-                    + " FOR UPDATE SKIP LOCKED";
+                    + " WHERE " + idCol + " IN ("
+                    +   "SELECT " + idCol + " FROM " + table
+                    +   " ORDER BY " + idCol
+                    +   " FETCH FIRST ? ROWS ONLY"
+                    + ") FOR UPDATE SKIP LOCKED";
             return jdbc.query(sql, (rs, rowNum) -> mapRow(rs, config),
                     config.getBatchSize());
         }
