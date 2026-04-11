@@ -37,6 +37,20 @@ public class OutboxTableProperties {
     /** Maximum number of rows to process in one poll cycle. Default: 100. */
     private int batchSize = 100;
 
+    /**
+     * When {@code true}, the poller skips the configured polling delay and
+     * immediately starts the next poll cycle whenever the previous cycle
+     * returned a full batch (i.e. {@code records.size() == batchSize}).
+     *
+     * <p>This allows the poller to drain a large backlog of outbox rows
+     * as quickly as possible without waiting between cycles.  The delay is
+     * only applied once the poller fetches fewer rows than {@code batchSize},
+     * which indicates the backlog has been caught up.
+     *
+     * <p>Default: {@code false} (always apply the configured delay).
+     */
+    private boolean skipDelayOnFullBatch = false;
+
     // ── Column mapping ───────────────────────────────────────────────────────
 
     /** Primary-key column (also used as Kafka record key when {@code keyColumn} is absent). Required. */
@@ -112,6 +126,9 @@ public class OutboxTableProperties {
 
     public int getBatchSize() { return batchSize; }
     public void setBatchSize(int batchSize) { this.batchSize = batchSize; }
+
+    public boolean isSkipDelayOnFullBatch() { return skipDelayOnFullBatch; }
+    public void setSkipDelayOnFullBatch(boolean skipDelayOnFullBatch) { this.skipDelayOnFullBatch = skipDelayOnFullBatch; }
 
     public String getIdColumn() { return idColumn; }
     public void setIdColumn(String idColumn) { this.idColumn = idColumn; }

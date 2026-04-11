@@ -80,10 +80,11 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                     .name("outbox-poller-" + tableConfig.getTableName())
                     .start(() -> runPollerLoop(poller, tableConfig));
             pollerThreads.add(thread);
-            log.info("Started outbox poller for table '{}' (interval={}ms, batch={})",
+            log.info("Started outbox poller for table '{}' (interval={}ms, batch={}, skipDelayOnFullBatch={})",
                     tableConfig.getTableName(),
                     tableConfig.getPollIntervalMs(),
-                    tableConfig.getBatchSize());
+                    tableConfig.getBatchSize(),
+                    tableConfig.isSkipDelayOnFullBatch());
         }
         running.set(true);
     }
@@ -129,8 +130,14 @@ public class OutboxPollerRegistry implements SmartLifecycle {
         log.debug("Poller loop started for table '{}'", config.getTableName());
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                poller.poll();
-                Thread.sleep(config.getPollIntervalMs());
+                int processed = poller.poll();
+                boolean fullBatch = processed == config.getBatchSize();
+                if (config.isSkipDelayOnFullBatch() && fullBatch) {
+                    log.debug("Full batch of {} processed for table '{}' – skipping delay",
+                            processed, config.getTableName());
+                } else {
+                    Thread.sleep(config.getPollIntervalMs());
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

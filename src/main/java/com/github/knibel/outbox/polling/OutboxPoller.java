@@ -67,12 +67,15 @@ public class OutboxPoller {
      * <p>Any exception is propagated to the caller without being swallowed.
      * This ensures that an error stops the application rather than silently
      * skipping records and breaking ordering.
+     *
+     * @return the number of records processed in this cycle (0 if there were
+     *         no pending rows)
      */
-    public void poll() {
+    public int poll() {
         List<OutboxRecord> records = repository.claimBatch(config);
 
         if (records.isEmpty()) {
-            return;
+            return 0;
         }
 
         claimedCounter.increment(records.size());
@@ -95,6 +98,7 @@ public class OutboxPoller {
             }
         }
         processedCounter.increment(ids.size());
+        return ids.size();
     }
 
     OutboxTableProperties getConfig() {
