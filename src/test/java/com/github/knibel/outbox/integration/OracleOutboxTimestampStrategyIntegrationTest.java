@@ -120,7 +120,7 @@ class OracleOutboxTimestampStrategyIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute("TRUNCATE TABLE \"test_outbox\"");
+        jdbcTemplate.execute("DELETE FROM \"test_outbox\"");
 
         consumer = createConsumer(kafkaBootstrapServers);
         consumer.subscribe(Collections.singletonList("oracle-timestamp-topic"));
