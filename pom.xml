@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.github.knibel</groupId>
+    <groupId>de.knibel</groupId>
     <artifactId>sql-outbox-kafka-adapter</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>sql-outbox-kafka-adapter</name>
