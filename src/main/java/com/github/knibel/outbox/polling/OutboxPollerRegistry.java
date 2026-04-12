@@ -241,7 +241,6 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             // When no custom query is used, all identifiers must be safe SQL identifiers
             if (!hasCustomQuery) {
                 SqlIdentifier.quote(cfg.getTableName());
-                SqlIdentifier.quote(cfg.getIdColumn());
                 if (cfg.getAcknowledgementStrategy() == AcknowledgementStrategy.STATUS) {
                     SqlIdentifier.quote(cfg.getStatusColumn());
                 }
