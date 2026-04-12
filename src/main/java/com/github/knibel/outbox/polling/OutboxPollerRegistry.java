@@ -148,7 +148,7 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                 if (processed > 0) {
                     lastRecordReadTimeMs = System.currentTimeMillis();
                 }
-                transientErrorFirstSeenMs = null; // reset on any successful cycle
+                transientErrorFirstSeenMs = null; // reset whenever poll() completes without throwing
                 boolean fullBatch = processed == config.getBatchSize();
                 if (config.isSkipDelayOnFullBatch() && fullBatch) {
                     log.debug("Full batch of {} processed for table '{}' – skipping delay",
