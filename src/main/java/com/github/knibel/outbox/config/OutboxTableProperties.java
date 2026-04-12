@@ -220,9 +220,9 @@ public class OutboxTableProperties {
      * <p>Example:
      * <pre>
      * customAcknowledgementQuery: >
-     *   UPDATE RPS_ADR_STATUS
+     *   UPDATE OUTBOX
      *   SET DATEN_ABGEHOLT_JN = 1, DATEN_ABHOLUNG_DAT = CURRENT_TIMESTAMP
-     *   WHERE STICHTAG_DAT = ? AND DWH_JOB_ID_RPS_ADR = ?
+     *   WHERE STICHTAG_DAT = ?
      * </pre>
      *
      * <p><b>Note:</b> This query receives the row's {@code idColumn} value
