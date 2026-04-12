@@ -163,6 +163,28 @@ public class OutboxTableProperties {
      */
     private String processedAtColumn;
 
+    // ── Transient DB error tolerance ─────────────────────────────────────────
+
+    /**
+     * Minimum idle time in milliseconds (time A) – i.e. the duration since
+     * the last poll cycle that actually returned records – before transient
+     * DB errors are silently suppressed.
+     *
+     * <p>A value of {@code 0} (the default) disables silent suppression:
+     * every transient DB error is always logged.
+     */
+    private long transientDbErrorSilenceAfterIdleMs = 0;
+
+    /**
+     * Duration in milliseconds (time B) for which transient DB errors are
+     * silently ignored once the idle threshold
+     * ({@link #transientDbErrorSilenceAfterIdleMs}) has been exceeded.
+     *
+     * <p>A value of {@code 0} (the default) disables silent suppression.
+     * After this window has elapsed the errors are logged again.
+     */
+    private long transientDbErrorSilenceDurationMs = 0;
+
     // ── Getters / setters ─────────────────────────────────────────────────────
 
     public String getTableName() { return tableName; }
@@ -215,4 +237,10 @@ public class OutboxTableProperties {
 
     public String getProcessedAtColumn() { return processedAtColumn; }
     public void setProcessedAtColumn(String processedAtColumn) { this.processedAtColumn = processedAtColumn; }
+
+    public long getTransientDbErrorSilenceAfterIdleMs() { return transientDbErrorSilenceAfterIdleMs; }
+    public void setTransientDbErrorSilenceAfterIdleMs(long transientDbErrorSilenceAfterIdleMs) { this.transientDbErrorSilenceAfterIdleMs = transientDbErrorSilenceAfterIdleMs; }
+
+    public long getTransientDbErrorSilenceDurationMs() { return transientDbErrorSilenceDurationMs; }
+    public void setTransientDbErrorSilenceDurationMs(long transientDbErrorSilenceDurationMs) { this.transientDbErrorSilenceDurationMs = transientDbErrorSilenceDurationMs; }
 }
