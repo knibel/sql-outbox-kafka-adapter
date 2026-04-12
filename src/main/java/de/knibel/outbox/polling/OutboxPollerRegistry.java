@@ -6,9 +6,9 @@ import de.knibel.outbox.config.FieldMapping;
 import de.knibel.outbox.config.OutboxProperties;
 import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.config.RowMappingStrategy;
-import de.knibel.outbox.jdbc.OutboxRepository;
 import de.knibel.outbox.jdbc.SqlIdentifier;
-import de.knibel.outbox.kafka.OutboxKafkaProducer;
+import de.knibel.outbox.repository.OutboxRepository;
+import de.knibel.outbox.transport.MessageSender;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +53,7 @@ public class OutboxPollerRegistry implements SmartLifecycle {
 
     private final OutboxProperties outboxProperties;
     private final OutboxRepository repository;
-    private final OutboxKafkaProducer kafkaProducer;
+    private final MessageSender messageSender;
     private final MeterRegistry meterRegistry;
     private final ApplicationContext applicationContext;
 
@@ -62,12 +62,12 @@ public class OutboxPollerRegistry implements SmartLifecycle {
 
     public OutboxPollerRegistry(OutboxProperties outboxProperties,
                                 OutboxRepository repository,
-                                OutboxKafkaProducer kafkaProducer,
+                                MessageSender messageSender,
                                 MeterRegistry meterRegistry,
                                 ApplicationContext applicationContext) {
         this.outboxProperties = outboxProperties;
         this.repository = repository;
-        this.kafkaProducer = kafkaProducer;
+        this.messageSender = messageSender;
         this.meterRegistry = meterRegistry;
         this.applicationContext = applicationContext;
     }
@@ -86,7 +86,7 @@ public class OutboxPollerRegistry implements SmartLifecycle {
         validateConfigs(tables);
 
         for (OutboxTableProperties tableConfig : tables) {
-            OutboxPoller poller = new OutboxPoller(tableConfig, repository, kafkaProducer, meterRegistry);
+            OutboxPoller poller = new OutboxPoller(tableConfig, repository, messageSender, meterRegistry);
             Thread thread = Thread.ofVirtual()
                     .name("outbox-poller-" + tableConfig.getTableName())
                     .start(() -> runPollerLoop(poller, tableConfig));

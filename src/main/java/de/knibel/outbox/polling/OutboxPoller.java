@@ -3,8 +3,8 @@ package de.knibel.outbox.polling;
 import de.knibel.outbox.config.AcknowledgementStrategy;
 import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.domain.OutboxRecord;
-import de.knibel.outbox.jdbc.OutboxRepository;
-import de.knibel.outbox.kafka.OutboxKafkaProducer;
+import de.knibel.outbox.repository.OutboxRepository;
+import de.knibel.outbox.transport.MessageSender;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
@@ -18,7 +18,8 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li><b>Claim</b> – select a batch of pending rows with
  *       {@code FOR UPDATE SKIP LOCKED}.
- *   <li><b>Publish</b> – send each row to Kafka and flush.
+ *   <li><b>Publish</b> – send each row via the configured
+ *       {@link MessageSender} and flush.
  *   <li><b>Acknowledge</b> – apply the configured
  *       {@link AcknowledgementStrategy}: update a status column, delete the
  *       rows, or write a processed-at timestamp.
@@ -38,17 +39,17 @@ public class OutboxPoller {
 
     private final OutboxTableProperties config;
     private final OutboxRepository repository;
-    private final OutboxKafkaProducer kafkaProducer;
+    private final MessageSender messageSender;
     private final Counter claimedCounter;
     private final Counter processedCounter;
 
     OutboxPoller(OutboxTableProperties config,
                  OutboxRepository repository,
-                 OutboxKafkaProducer kafkaProducer,
+                 MessageSender messageSender,
                  MeterRegistry meterRegistry) {
         this.config = config;
         this.repository = repository;
-        this.kafkaProducer = kafkaProducer;
+        this.messageSender = messageSender;
 
         String table = config.getTableName();
         this.claimedCounter = Counter.builder("outbox.rows.claimed")
@@ -82,7 +83,7 @@ public class OutboxPoller {
         log.debug("Claimed {} row(s) from table '{}'", records.size(), config.getTableName());
 
         List<String> ids = records.stream().map(OutboxRecord::id).toList();
-        kafkaProducer.sendBatch(records);
+        messageSender.sendBatch(records);
         switch (config.getAcknowledgementStrategy()) {
             case DELETE -> {
                 repository.deleteByIds(config, ids);

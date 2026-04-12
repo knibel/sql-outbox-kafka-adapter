@@ -1,6 +1,7 @@
-package de.knibel.outbox.kafka;
+package de.knibel.outbox.transport.kafka;
 
 import de.knibel.outbox.domain.OutboxRecord;
+import de.knibel.outbox.transport.MessageTransport;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +15,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Thin wrapper around {@link KafkaProducer} that publishes a batch of
+ * Kafka implementation of {@link MessageTransport}.
+ *
+ * <p>Thin wrapper around {@link KafkaProducer} that publishes a batch of
  * {@link OutboxRecord}s and waits for broker acknowledgement.
  *
  * <p><b>Delivery guarantee:</b>
@@ -32,24 +35,17 @@ import org.springframework.stereotype.Component;
  * duplicate messages on producer retries within a session.
  */
 @Component
-public class OutboxKafkaProducer {
+public class KafkaMessageTransport implements MessageTransport {
 
-    private static final Logger log = LoggerFactory.getLogger(OutboxKafkaProducer.class);
+    private static final Logger log = LoggerFactory.getLogger(KafkaMessageTransport.class);
 
     private final KafkaProducer<String, String> producer;
 
-    public OutboxKafkaProducer(KafkaProducer<String, String> producer) {
+    public KafkaMessageTransport(KafkaProducer<String, String> producer) {
         this.producer = producer;
     }
 
-    /**
-     * Publishes all records in the batch and blocks until the broker has
-     * acknowledged every record.
-     *
-     * @param records non-empty list of outbox records to publish.
-     * @throws KafkaBatchException if one or more records could not be delivered.
-     * @throws IllegalArgumentException if a record has a null or blank topic.
-     */
+    @Override
     public void sendBatch(List<OutboxRecord> records) {
         if (records.isEmpty()) return;
 
@@ -97,7 +93,7 @@ public class OutboxKafkaProducer {
         }
     }
 
-    /** Closes the underlying producer gracefully. */
+    @Override
     public void close() {
         producer.close();
     }
