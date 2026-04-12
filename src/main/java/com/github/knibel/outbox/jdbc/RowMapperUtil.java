@@ -90,6 +90,21 @@ public final class RowMapperUtil {
      */
     public static String buildCamelCasePayload(ResultSet rs, ObjectMapper objectMapper)
             throws SQLException, JsonProcessingException {
+        return buildCamelCasePayload(rs, objectMapper, Map.of());
+    }
+
+    /**
+     * Reads all columns from the current result-set row and builds a JSON
+     * object with {@code camelCase} keys, then applies any static fields.
+     *
+     * @param rs           positioned result-set row
+     * @param objectMapper Jackson mapper for serialization
+     * @param staticFields constant key-value pairs to inject (may be empty)
+     * @return JSON string, e.g. {@code {"orderId":"123","customerName":"John"}}
+     */
+    public static String buildCamelCasePayload(ResultSet rs, ObjectMapper objectMapper,
+                                                Map<String, String> staticFields)
+            throws SQLException, JsonProcessingException {
         ResultSetMetaData meta = rs.getMetaData();
         int columnCount = meta.getColumnCount();
 
@@ -100,6 +115,7 @@ public final class RowMapperUtil {
             Object value = rs.getObject(i);
             payload.put(camelKey, value);
         }
+        applyStaticFields(payload, staticFields);
         return objectMapper.writeValueAsString(payload);
     }
 
@@ -131,6 +147,25 @@ public final class RowMapperUtil {
                                             Map<String, FieldMapping> fieldMappings,
                                             ObjectMapper objectMapper)
             throws SQLException, JsonProcessingException {
+        return buildCustomPayload(rs, fieldMappings, objectMapper, Map.of());
+    }
+
+    /**
+     * Reads the columns specified in {@code fieldMappings} from the current
+     * result-set row, builds a (possibly nested) JSON object, and then
+     * applies any {@code staticFields}.
+     *
+     * @param rs            positioned result-set row
+     * @param fieldMappings source-column → {@link FieldMapping} mapping
+     * @param objectMapper  Jackson mapper for serialization
+     * @param staticFields  constant key-value pairs to inject (may be empty)
+     * @return JSON string representing the mapped payload
+     */
+    public static String buildCustomPayload(ResultSet rs,
+                                            Map<String, FieldMapping> fieldMappings,
+                                            ObjectMapper objectMapper,
+                                            Map<String, String> staticFields)
+            throws SQLException, JsonProcessingException {
         Map<String, Object> root = new LinkedHashMap<>();
         for (Map.Entry<String, FieldMapping> entry : fieldMappings.entrySet()) {
             String sourceColumn = entry.getKey();
@@ -140,7 +175,26 @@ public final class RowMapperUtil {
             Object converted = convertValue(mapped, mapping.getDataType(), mapping.getFormat());
             setNestedValue(root, mapping.getName(), converted);
         }
+        applyStaticFields(root, staticFields);
         return objectMapper.writeValueAsString(root);
+    }
+
+    // ── Static fields ───────────────────────────────────────────────────────
+
+    /**
+     * Injects static key-value pairs into the given map.
+     *
+     * <p>Keys are target JSON field paths (dot-separated for nesting).
+     * Applied <em>after</em> column-based mappings so they can override
+     * column-derived values.
+     */
+    static void applyStaticFields(Map<String, Object> root, Map<String, String> staticFields) {
+        if (staticFields == null || staticFields.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : staticFields.entrySet()) {
+            setNestedValue(root, entry.getKey(), entry.getValue());
+        }
     }
 
     // ── Value mapping ────────────────────────────────────────────────────────

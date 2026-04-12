@@ -92,6 +92,10 @@ public class OutboxPoller {
                 repository.markProcessedAt(config, ids);
                 log.debug("Timestamped {} row(s) in table '{}'", ids.size(), config.getTableName());
             }
+            case CUSTOM -> {
+                repository.executeCustomAcknowledgement(config, ids);
+                log.debug("Custom-acknowledged {} row(s) in table '{}'", ids.size(), config.getTableName());
+            }
             default -> {
                 repository.markDone(config, ids);
                 log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());

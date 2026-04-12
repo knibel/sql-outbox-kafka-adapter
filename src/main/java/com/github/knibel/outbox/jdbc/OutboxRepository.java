@@ -78,6 +78,13 @@ public class OutboxRepository {
      */
     @Transactional
     public List<OutboxRecord> claimBatch(OutboxTableProperties config) {
+        // ── Custom query: execute user-provided SQL as-is ───────────────
+        if (config.getCustomQuery() != null && !config.getCustomQuery().isBlank()) {
+            return jdbc.query(config.getCustomQuery(),
+                    (rs, rowNum) -> mapRow(rs, config));
+        }
+
+        // ── Auto-generated query ────────────────────────────────────────
         String table      = SqlIdentifier.quote(config.getTableName());
         String idCol      = SqlIdentifier.quote(config.getIdColumn());
         String selectList = buildSelectList(config);
@@ -187,6 +194,21 @@ public class OutboxRepository {
         namedJdbc.update(sql, params);
     }
 
+    /**
+     * Executes the user-provided custom acknowledgement query for each
+     * processed row.  The query receives the row's {@code idColumn} value
+     * as the sole bind parameter ({@code ?}).
+     */
+    @Transactional
+    public void executeCustomAcknowledgement(OutboxTableProperties config, List<String> ids) {
+        if (ids.isEmpty()) return;
+
+        String sql = config.getCustomAcknowledgementQuery();
+        for (String id : ids) {
+            jdbc.update(sql, id);
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────────
 
     /** Builds the comma-separated SELECT column list. */
@@ -259,10 +281,11 @@ public class OutboxRepository {
 
         String payload;
         RowMappingStrategy rowMapping = config.getRowMappingStrategy();
+        Map<String, String> staticFields = config.getStaticFields();
 
         if (rowMapping == RowMappingStrategy.TO_CAMEL_CASE) {
             try {
-                payload = RowMapperUtil.buildCamelCasePayload(rs, objectMapper);
+                payload = RowMapperUtil.buildCamelCasePayload(rs, objectMapper, staticFields);
             } catch (Exception e) {
                 log.warn("Failed to build camelCase payload for table '{}', row id='{}': {}",
                         config.getTableName(), id, e.getMessage());
@@ -270,7 +293,7 @@ public class OutboxRepository {
             }
         } else if (rowMapping == RowMappingStrategy.CUSTOM) {
             try {
-                payload = RowMapperUtil.buildCustomPayload(rs, config.getFieldMappings(), objectMapper);
+                payload = RowMapperUtil.buildCustomPayload(rs, config.getFieldMappings(), objectMapper, staticFields);
             } catch (Exception e) {
                 log.warn("Failed to build custom payload for table '{}', row id='{}': {}",
                         config.getTableName(), id, e.getMessage());

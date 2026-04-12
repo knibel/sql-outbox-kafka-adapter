@@ -39,5 +39,12 @@ public enum AcknowledgementStrategy {
      * {@code processedAtColumn}.  Rows with a {@code NULL} value in that
      * column are considered pending.
      */
-    TIMESTAMP
+    TIMESTAMP,
+
+    /**
+     * Mark rows as processed by executing a user-provided SQL statement
+     * ({@code customAcknowledgementQuery}).  The statement receives the
+     * row's {@code idColumn} value as a single bind parameter ({@code ?}).
+     */
+    CUSTOM
 }
