@@ -77,6 +77,32 @@ Each entry in the `tables` list configures one outbox table.
 | `topicColumn` | _(none)_ | Column used to determine the Kafka topic per row (enables per-row topic routing). When absent, `staticTopic` is used. |
 | `staticTopic` | _(none)_ | Kafka topic used for all rows when `topicColumn` is not set. |
 
+#### Row mapping strategy
+
+Controls how SQL row columns are mapped to the Kafka record value (payload).
+
+| Strategy | Behaviour |
+|---|---|
+| `PAYLOAD_COLUMN` _(default)_ | Reads a pre-serialized JSON string from `payloadColumn`. |
+| `TO_CAMEL_CASE` | Selects all columns and converts each `snake_case` column name to `camelCase` in the resulting JSON payload. No `payloadColumn` needed. |
+| `CUSTOM` | Uses the explicit `fieldMappings` to map source columns to target JSON fields. Supports nested objects via dot-separated paths, data type conversion, date/datetime formatting, and value mapping. |
+
+| Property | Default | Description |
+|---|---|---|
+| `rowMappingStrategy` | `PAYLOAD_COLUMN` | One of `PAYLOAD_COLUMN`, `TO_CAMEL_CASE`, `CUSTOM`. |
+| `fieldMappings` | _(empty)_ | Required when `rowMappingStrategy` is `CUSTOM`. A map of source SQL column names to field mapping objects. |
+
+##### Field mapping properties (`fieldMappings.<column>`)
+
+Each entry in `fieldMappings` maps a source SQL column to a target JSON field:
+
+| Property | Required | Description |
+|---|---|---|
+| `name` | **yes** | Target JSON field path. Dot-separated paths produce nested objects (e.g. `customer.address.city`). |
+| `dataType` | no | Target data type for conversion. One of: `STRING`, `INTEGER`, `LONG`, `DOUBLE`, `BOOLEAN`, `DECIMAL`, `DATE`, `DATETIME`. When omitted, the JDBC driver's default Java mapping is used. |
+| `format` | when `dataType` is `DATE` or `DATETIME` | A `DateTimeFormatter` pattern (e.g. `yyyy-MM-dd`, `yyyy-MM-dd'T'HH:mm:ss`). Accepts `java.sql.Date`, `java.sql.Timestamp`, `LocalDate`, `LocalDateTime`, `Instant`, and `java.util.Date`. |
+| `valueMappings` | no | A map of raw database values (as strings) to replacement output values. Applied _before_ `dataType` conversion. Useful for translating integer codes to enum strings (e.g. `"1": ACTIVE`). Unmapped values pass through unchanged. |
+
 #### Acknowledgement strategy
 
 After a row is successfully published, the adapter marks it as done according to
@@ -241,3 +267,169 @@ outbox:
     - tableName: orders_outbox
       staticTopic: orders
 ```
+
+### TO_CAMEL_CASE row mapping
+
+Converts all column names from `snake_case` to `camelCase` automatically:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      rowMappingStrategy: TO_CAMEL_CASE
+      acknowledgementStrategy: STATUS
+      statusColumn: status
+```
+
+```sql
+CREATE TABLE orders_outbox (
+    id             VARCHAR(36)    PRIMARY KEY,
+    order_id       VARCHAR(100)   NOT NULL,
+    customer_name  VARCHAR(100),
+    total_amount   NUMERIC(10,2),
+    status         VARCHAR(16)    NOT NULL DEFAULT 'PENDING'
+);
+```
+
+A row with `order_id='ORD-001'`, `customer_name='John Doe'`, `total_amount=99.95`
+produces:
+
+```json
+{"id":"…","orderId":"ORD-001","customerName":"John Doe","totalAmount":99.95,"status":"DONE"}
+```
+
+### CUSTOM row mapping with nested objects
+
+Map specific columns to target JSON paths, including nested objects via
+dot-separated paths:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      rowMappingStrategy: CUSTOM
+      acknowledgementStrategy: STATUS
+      statusColumn: status
+      fieldMappings:
+        order_id:
+          name: orderId
+        customer_name:
+          name: customer.name
+        customer_email:
+          name: customer.email
+        city:
+          name: customer.address.city
+```
+
+Produces:
+
+```json
+{
+  "orderId": "ORD-001",
+  "customer": {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "address": {
+      "city": "Berlin"
+    }
+  }
+}
+```
+
+### CUSTOM row mapping with data type conversion
+
+Use `dataType` to convert column values to specific types in the JSON output:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      rowMappingStrategy: CUSTOM
+      fieldMappings:
+        order_id:
+          name: orderId
+          dataType: STRING
+        total_amount:
+          name: totalAmount
+          dataType: DOUBLE
+        is_active:
+          name: active
+          dataType: BOOLEAN
+```
+
+### CUSTOM row mapping with date/datetime formatting
+
+Format temporal columns using `DateTimeFormatter` patterns:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      rowMappingStrategy: CUSTOM
+      fieldMappings:
+        order_id:
+          name: orderId
+        created_at:
+          name: createdAt
+          dataType: DATETIME
+          format: "yyyy-MM-dd'T'HH:mm:ss"
+        order_date:
+          name: orderDate
+          dataType: DATE
+          format: "yyyy-MM-dd"
+```
+
+A row with `created_at=2024-01-15 10:30:45` and `order_date=2024-01-15` produces:
+
+```json
+{"orderId":"ORD-001","createdAt":"2024-01-15T10:30:45","orderDate":"2024-01-15"}
+```
+
+### CUSTOM row mapping with value mapping
+
+Translate raw database values (e.g. integer codes) to human-readable strings:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      rowMappingStrategy: CUSTOM
+      fieldMappings:
+        order_id:
+          name: orderId
+        status_code:
+          name: status
+          valueMappings:
+            "1": ACTIVE
+            "2": INACTIVE
+            "3": DELETED
+        priority:
+          name: priority
+          valueMappings:
+            "0": LOW
+            "1": MEDIUM
+            "2": HIGH
+```
+
+A row with `status_code=1` and `priority=2` produces:
+
+```json
+{"orderId":"ORD-001","status":"ACTIVE","priority":"HIGH"}
+```
+
+Values not present in the mapping pass through unchanged.
