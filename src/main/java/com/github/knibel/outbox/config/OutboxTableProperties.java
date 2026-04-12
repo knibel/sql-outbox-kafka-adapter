@@ -54,6 +54,22 @@ public class OutboxTableProperties {
      */
     private boolean skipDelayOnFullBatch = false;
 
+    // ── Custom SQL query ────────────────────────────────────────────────────
+
+    /**
+     * Optional custom SQL SELECT query used to fetch pending rows.
+     *
+     * <p>When set, this query is executed as-is (no additional
+     * {@code FOR UPDATE SKIP LOCKED} or row-limiting is appended).
+     * The query must return all columns required by the configured
+     * row-mapping strategy (e.g. {@code idColumn}, {@code keyColumn},
+     * {@code payloadColumn}, field-mapping source columns, etc.).
+     *
+     * <p>When {@code null} (the default), the adapter auto-generates
+     * the SELECT statement based on the other configuration properties.
+     */
+    private String customQuery;
+
     // ── Column mapping ───────────────────────────────────────────────────────
 
     /** Primary-key column (also used as Kafka record key when {@code keyColumn} is absent). Required. */
@@ -127,6 +143,33 @@ public class OutboxTableProperties {
      */
     private Map<String, FieldMapping> fieldMappings = new LinkedHashMap<>();
 
+    /**
+     * Static key-value pairs injected into every JSON payload.
+     *
+     * <p>Used together with {@link RowMappingStrategy#CUSTOM CUSTOM} or
+     * {@link RowMappingStrategy#TO_CAMEL_CASE TO_CAMEL_CASE} to add
+     * constant values that do not come from a database column (e.g. a
+     * type discriminator).
+     *
+     * <p>Keys are target JSON field paths (dot-separated for nesting,
+     * just like {@link FieldMapping#getName()}).  Values are the constant
+     * string values written to the payload.  Static fields are applied
+     * <em>after</em> column-based mappings, so they can override a
+     * column-derived value if the same path is used.
+     *
+     * <p>Ignored when {@code rowMappingStrategy} is
+     * {@link RowMappingStrategy#PAYLOAD_COLUMN PAYLOAD_COLUMN}.
+     *
+     * <p>Example:
+     * <pre>
+     *   staticFields:
+     *     ereignistyp: "BatchlaufStatus.BatchlaufinfoBereitgestellt"
+     *     meta.source: "outbox-adapter"
+     * </pre>
+     * Produces: {@code {"ereignistyp":"BatchlaufStatus.BatchlaufinfoBereitgestellt","meta":{"source":"outbox-adapter"}}}
+     */
+    private Map<String, String> staticFields = new LinkedHashMap<>();
+
     // ── Acknowledgement strategy ─────────────────────────────────────────────
 
     /**
@@ -162,6 +205,32 @@ public class OutboxTableProperties {
      * pending.  Required for TIMESTAMP strategy.
      */
     private String processedAtColumn;
+
+    // ── Custom acknowledgement query ─────────────────────────────────────────
+
+    /**
+     * Optional custom SQL statement executed to acknowledge each row after
+     * successful Kafka publishing.
+     *
+     * <p>Used only when {@code acknowledgementStrategy} is
+     * {@link AcknowledgementStrategy#CUSTOM CUSTOM}.  The statement is
+     * executed once per processed row with a single bind parameter
+     * ({@code ?}) that receives the row's {@code idColumn} value.
+     *
+     * <p>Example:
+     * <pre>
+     * customAcknowledgementQuery: >
+     *   UPDATE RPS_ADR_STATUS
+     *   SET DATEN_ABGEHOLT_JN = 1, DATEN_ABHOLUNG_DAT = CURRENT_TIMESTAMP
+     *   WHERE STICHTAG_DAT = ? AND DWH_JOB_ID_RPS_ADR = ?
+     * </pre>
+     *
+     * <p><b>Note:</b> This query receives the row's {@code idColumn} value
+     * as the sole bind parameter.  If your acknowledgement needs multiple
+     * columns, consider using a single synthetic key or embedding the logic
+     * in the SQL (e.g. a stored procedure call).
+     */
+    private String customAcknowledgementQuery;
 
     // ── Transient DB error tolerance ─────────────────────────────────────────
 
@@ -243,4 +312,13 @@ public class OutboxTableProperties {
 
     public long getTransientDbErrorSilenceDurationMs() { return transientDbErrorSilenceDurationMs; }
     public void setTransientDbErrorSilenceDurationMs(long transientDbErrorSilenceDurationMs) { this.transientDbErrorSilenceDurationMs = transientDbErrorSilenceDurationMs; }
+
+    public String getCustomQuery() { return customQuery; }
+    public void setCustomQuery(String customQuery) { this.customQuery = customQuery; }
+
+    public Map<String, String> getStaticFields() { return staticFields; }
+    public void setStaticFields(Map<String, String> staticFields) { this.staticFields = staticFields; }
+
+    public String getCustomAcknowledgementQuery() { return customAcknowledgementQuery; }
+    public void setCustomAcknowledgementQuery(String customAcknowledgementQuery) { this.customAcknowledgementQuery = customAcknowledgementQuery; }
 }

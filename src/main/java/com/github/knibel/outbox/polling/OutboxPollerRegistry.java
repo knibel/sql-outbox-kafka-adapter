@@ -1,5 +1,6 @@
 package com.github.knibel.outbox.polling;
 
+import com.github.knibel.outbox.config.AcknowledgementStrategy;
 import com.github.knibel.outbox.config.FieldDataType;
 import com.github.knibel.outbox.config.FieldMapping;
 import com.github.knibel.outbox.config.OutboxProperties;
@@ -234,16 +235,27 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             if (name == null || name.isBlank()) {
                 throw new IllegalArgumentException("outbox table config is missing 'tableName'");
             }
-            SqlIdentifier.quote(cfg.getTableName());
+
+            boolean hasCustomQuery = cfg.getCustomQuery() != null && !cfg.getCustomQuery().isBlank();
+
+            // When no custom query is used, all identifiers must be safe SQL identifiers
+            if (!hasCustomQuery) {
+                SqlIdentifier.quote(cfg.getTableName());
+                SqlIdentifier.quote(cfg.getIdColumn());
+                if (cfg.getAcknowledgementStrategy() == AcknowledgementStrategy.STATUS) {
+                    SqlIdentifier.quote(cfg.getStatusColumn());
+                }
+                if (cfg.getKeyColumn() != null)     SqlIdentifier.quote(cfg.getKeyColumn());
+                if (cfg.getTopicColumn() != null)   SqlIdentifier.quote(cfg.getTopicColumn());
+                if (cfg.getHeadersColumn() != null) SqlIdentifier.quote(cfg.getHeadersColumn());
+            }
+
+            // idColumn is always validated because it's used for Kafka key fallback and ack
             SqlIdentifier.quote(cfg.getIdColumn());
-            SqlIdentifier.quote(cfg.getStatusColumn());
-            if (cfg.getKeyColumn() != null)     SqlIdentifier.quote(cfg.getKeyColumn());
-            if (cfg.getTopicColumn() != null)   SqlIdentifier.quote(cfg.getTopicColumn());
-            if (cfg.getHeadersColumn() != null) SqlIdentifier.quote(cfg.getHeadersColumn());
 
             // Validate payloadColumn only when the PAYLOAD_COLUMN strategy is used
             RowMappingStrategy rowMapping = cfg.getRowMappingStrategy();
-            if (rowMapping == RowMappingStrategy.PAYLOAD_COLUMN) {
+            if (rowMapping == RowMappingStrategy.PAYLOAD_COLUMN && !hasCustomQuery) {
                 SqlIdentifier.quote(cfg.getPayloadColumn());
             }
 
@@ -255,7 +267,9 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                             "Table '" + name + "': rowMappingStrategy=CUSTOM requires non-empty 'fieldMappings'");
                 }
                 for (var entry : cfg.getFieldMappings().entrySet()) {
-                    SqlIdentifier.quote(entry.getKey());
+                    if (!hasCustomQuery) {
+                        SqlIdentifier.quote(entry.getKey());
+                    }
                     FieldMapping mapping = entry.getValue();
                     if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
                         throw new IllegalArgumentException(
@@ -271,6 +285,24 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                                 + entry.getKey() + "' with dataType=" + dt
                                 + " requires a non-blank 'format' pattern");
                     }
+                }
+            }
+
+            // Validate staticFields: paths must be non-blank
+            if (cfg.getStaticFields() != null) {
+                for (var entry : cfg.getStaticFields().entrySet()) {
+                    if (entry.getKey() == null || entry.getKey().isBlank()) {
+                        throw new IllegalArgumentException(
+                                "Table '" + name + "': staticFields key must not be blank");
+                    }
+                }
+            }
+
+            // Validate CUSTOM acknowledgement strategy
+            if (cfg.getAcknowledgementStrategy() == AcknowledgementStrategy.CUSTOM) {
+                if (cfg.getCustomAcknowledgementQuery() == null || cfg.getCustomAcknowledgementQuery().isBlank()) {
+                    throw new IllegalArgumentException(
+                            "Table '" + name + "': acknowledgementStrategy=CUSTOM requires non-blank 'customAcknowledgementQuery'");
                 }
             }
 
