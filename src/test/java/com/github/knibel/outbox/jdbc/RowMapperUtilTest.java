@@ -304,4 +304,77 @@ class RowMapperUtilTest {
         assertThat(RowMapperUtil.applyValueMapping(true, mappings)).isEqualTo("YES");
         assertThat(RowMapperUtil.applyValueMapping(false, mappings)).isEqualTo("NO");
     }
+
+    // ── applyStaticFields ────────────────────────────────────────────────────
+
+    @Test
+    void applyStaticFields_nullMap_doesNothing() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("existing", "value");
+        RowMapperUtil.applyStaticFields(root, null);
+        assertThat(root).containsOnly(Map.entry("existing", "value"));
+    }
+
+    @Test
+    void applyStaticFields_emptyMap_doesNothing() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("existing", "value");
+        RowMapperUtil.applyStaticFields(root, Map.of());
+        assertThat(root).containsOnly(Map.entry("existing", "value"));
+    }
+
+    @Test
+    void applyStaticFields_flatKey_addsValue() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        RowMapperUtil.applyStaticFields(root, Map.of("ereignistyp", "BatchlaufStatus.BatchlaufinfoBereitgestellt"));
+        assertThat(root).containsEntry("ereignistyp", "BatchlaufStatus.BatchlaufinfoBereitgestellt");
+    }
+
+    @Test
+    void applyStaticFields_nestedKey_createsNestedObject() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        RowMapperUtil.applyStaticFields(root, Map.of("meta.source", "outbox-adapter"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) root.get("meta");
+        assertThat(meta).isNotNull().containsEntry("source", "outbox-adapter");
+    }
+
+    @Test
+    void applyStaticFields_overridesExistingValue() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("type", "from-db");
+        RowMapperUtil.applyStaticFields(root, Map.of("type", "overridden"));
+        assertThat(root).containsEntry("type", "overridden");
+    }
+
+    @Test
+    void applyStaticFields_mergesWithExistingNestedObject() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        RowMapperUtil.setNestedValue(root, "customer.name", "John");
+        RowMapperUtil.applyStaticFields(root, Map.of("customer.type", "premium"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> customer = (Map<String, Object>) root.get("customer");
+        assertThat(customer)
+                .containsEntry("name", "John")
+                .containsEntry("type", "premium");
+    }
+
+    @Test
+    void applyStaticFields_multipleEntries() {
+        Map<String, Object> root = new LinkedHashMap<>();
+        Map<String, String> statics = new LinkedHashMap<>();
+        statics.put("ereignistyp", "SomeType");
+        statics.put("meta.source", "adapter");
+        statics.put("meta.version", "1.0");
+        RowMapperUtil.applyStaticFields(root, statics);
+
+        assertThat(root).containsEntry("ereignistyp", "SomeType");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) root.get("meta");
+        assertThat(meta)
+                .containsEntry("source", "adapter")
+                .containsEntry("version", "1.0");
+    }
 }
