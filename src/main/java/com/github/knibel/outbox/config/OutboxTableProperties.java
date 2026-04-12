@@ -1,5 +1,8 @@
 package com.github.knibel.outbox.config;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Configuration for a single outbox table.
  *
@@ -80,6 +83,50 @@ public class OutboxTableProperties {
     /** Static Kafka topic used when {@code topicColumn} is not set. */
     private String staticTopic;
 
+    // ── Row mapping strategy ─────────────────────────────────────────────────
+
+    /**
+     * How SQL row columns are mapped to the Kafka record value (payload).
+     * Default: {@link RowMappingStrategy#PAYLOAD_COLUMN}.
+     *
+     * <ul>
+     *   <li>{@code PAYLOAD_COLUMN} – reads the pre-serialized JSON payload from
+     *       a single configured {@code payloadColumn} (original behaviour).
+     *   <li>{@code TO_CAMEL_CASE} – selects all columns and converts every
+     *       {@code snake_case} column name to {@code camelCase} in the resulting
+     *       JSON payload.
+     *   <li>{@code CUSTOM} – uses the explicit {@code fieldMappings} to map
+     *       source columns to target JSON paths (supports nested objects via
+     *       dot-separated paths).
+     * </ul>
+     */
+    private RowMappingStrategy rowMappingStrategy = RowMappingStrategy.PAYLOAD_COLUMN;
+
+    /**
+     * Explicit column-to-JSON-field mappings, used only when
+     * {@code rowMappingStrategy} is {@link RowMappingStrategy#CUSTOM}.
+     *
+     * <p>Keys are source SQL column names; values are {@link FieldMapping}
+     * objects specifying the target JSON field path ({@code name}) and an
+     * optional data type ({@code dataType}) for type conversion.
+     * Dot-separated paths produce nested JSON objects.
+     *
+     * <p>Example:
+     * <pre>
+     *   fieldMappings:
+     *     order_id:
+     *       name: orderId
+     *       dataType: STRING
+     *     total_amount:
+     *       name: totalAmount
+     *       dataType: DOUBLE
+     *     customer_name:
+     *       name: customer.name
+     * </pre>
+     * Produces: {@code {"orderId":"…","totalAmount":99.95,"customer":{"name":"…"}}}
+     */
+    private Map<String, FieldMapping> fieldMappings = new LinkedHashMap<>();
+
     // ── Acknowledgement strategy ─────────────────────────────────────────────
 
     /**
@@ -159,6 +206,12 @@ public class OutboxTableProperties {
 
     public AcknowledgementStrategy getAcknowledgementStrategy() { return acknowledgementStrategy; }
     public void setAcknowledgementStrategy(AcknowledgementStrategy acknowledgementStrategy) { this.acknowledgementStrategy = acknowledgementStrategy; }
+
+    public RowMappingStrategy getRowMappingStrategy() { return rowMappingStrategy; }
+    public void setRowMappingStrategy(RowMappingStrategy rowMappingStrategy) { this.rowMappingStrategy = rowMappingStrategy; }
+
+    public Map<String, FieldMapping> getFieldMappings() { return fieldMappings; }
+    public void setFieldMappings(Map<String, FieldMapping> fieldMappings) { this.fieldMappings = fieldMappings; }
 
     public String getProcessedAtColumn() { return processedAtColumn; }
     public void setProcessedAtColumn(String processedAtColumn) { this.processedAtColumn = processedAtColumn; }

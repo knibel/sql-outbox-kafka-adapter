@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.knibel.outbox.config.AcknowledgementStrategy;
 import com.github.knibel.outbox.config.OutboxTableProperties;
+import com.github.knibel.outbox.config.RowMappingStrategy;
 import com.github.knibel.outbox.domain.OutboxRecord;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -190,6 +191,36 @@ public class OutboxRepository {
 
     /** Builds the comma-separated SELECT column list. */
     private String buildSelectList(OutboxTableProperties config) {
+        RowMappingStrategy rowMapping = config.getRowMappingStrategy();
+
+        if (rowMapping == RowMappingStrategy.TO_CAMEL_CASE) {
+            // Select all columns; the mapper will convert names to camelCase.
+            return "*";
+        }
+
+        if (rowMapping == RowMappingStrategy.CUSTOM) {
+            // Select meta columns + all source columns from the field mappings.
+            List<String> cols = new ArrayList<>();
+            cols.add(SqlIdentifier.quote(config.getIdColumn()));
+            if (config.getKeyColumn() != null) {
+                cols.add(SqlIdentifier.quote(config.getKeyColumn()));
+            }
+            if (config.getTopicColumn() != null) {
+                cols.add(SqlIdentifier.quote(config.getTopicColumn()));
+            }
+            if (config.getHeadersColumn() != null) {
+                cols.add(SqlIdentifier.quote(config.getHeadersColumn()));
+            }
+            for (String sourceColumn : config.getFieldMappings().keySet()) {
+                String quoted = SqlIdentifier.quote(sourceColumn);
+                if (!cols.contains(quoted)) {
+                    cols.add(quoted);
+                }
+            }
+            return String.join(", ", cols);
+        }
+
+        // PAYLOAD_COLUMN (default): original behaviour
         List<String> cols = new ArrayList<>();
         cols.add(SqlIdentifier.quote(config.getIdColumn()));
         if (config.getKeyColumn() != null) {
@@ -214,8 +245,6 @@ public class OutboxRepository {
                 ? rs.getString(config.getKeyColumn())
                 : id;
 
-        String payload = rs.getString(config.getPayloadColumn());
-
         String topic = config.getTopicColumn() != null
                 ? rs.getString(config.getTopicColumn())
                 : config.getStaticTopic();
@@ -227,6 +256,31 @@ public class OutboxRepository {
                 headers = parseHeaders(headersJson, config.getTableName());
             }
         }
+
+        String payload;
+        RowMappingStrategy rowMapping = config.getRowMappingStrategy();
+
+        if (rowMapping == RowMappingStrategy.TO_CAMEL_CASE) {
+            try {
+                payload = RowMapperUtil.buildCamelCasePayload(rs, objectMapper);
+            } catch (Exception e) {
+                log.warn("Failed to build camelCase payload for table '{}', row id='{}': {}",
+                        config.getTableName(), id, e.getMessage());
+                payload = "{}";
+            }
+        } else if (rowMapping == RowMappingStrategy.CUSTOM) {
+            try {
+                payload = RowMapperUtil.buildCustomPayload(rs, config.getFieldMappings(), objectMapper);
+            } catch (Exception e) {
+                log.warn("Failed to build custom payload for table '{}', row id='{}': {}",
+                        config.getTableName(), id, e.getMessage());
+                payload = "{}";
+            }
+        } else {
+            // PAYLOAD_COLUMN (default)
+            payload = rs.getString(config.getPayloadColumn());
+        }
+
         return new OutboxRecord(id, kafkaKey, topic, payload, headers);
     }
 
