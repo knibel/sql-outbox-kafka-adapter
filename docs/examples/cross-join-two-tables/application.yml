@@ -1,0 +1,162 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# sql-outbox-kafka-adapter – Example: two-table cross-join pattern
+#
+# This configuration demonstrates how to use the adapter with two tables
+# where:
+#   - Table 1 (data_records) holds individual data rows.  A row is visible
+#     to the poller only when a matching entry exists in Table 2
+#     (cross-table EXISTS join).  After publishing the row is deleted.
+#   - Table 2 (batch_status) tracks the completion of a batch.  A row
+#     becomes visible once no matching rows remain in Table 1
+#     (NOT EXISTS join).  After publishing, a fetched flag and a timestamp
+#     are written back.
+#
+# NOTE: Oracle stores unquoted DDL identifiers in uppercase.  All column and
+# table names below are therefore uppercase to match the Oracle schema.
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  application:
+    name: cross-join-outbox-adapter
+
+  datasource:
+    # Replace with your Oracle JDBC URL, username, and password.
+    url: jdbc:oracle:thin:@//oracle-host:1521/MYDB
+    username: myuser
+    password: mypassword
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+outbox:
+
+  kafka:
+    bootstrap-servers: kafka-broker:9092
+    # Uncomment and set a prefix to enable Kafka transactions (exactly-once).
+    # transactional-id-prefix: cross-join-outbox
+
+  tables:
+
+    # ── Table 1: DATA_RECORDS ─────────────────────────────────────────────────
+    #
+    # Rows are visible to the poller only when a matching entry exists in
+    # BATCH_STATUS (EXISTS join).  Each row is published and then deleted.
+    #
+    # Note: "companyId" is a static constant.  Adjust the value for your
+    # environment.  Static fields are always serialised as JSON strings; if
+    # the consumer expects a JSON number, apply a type cast on the consumer
+    # side or extend the adapter with a custom PayloadMapper.
+    # ─────────────────────────────────────────────────────────────────────────
+    - tableName: DATA_RECORDS
+
+      idColumn: LOAD_ID
+      keyColumn: ENTITY_ID
+
+      staticTopic: data-request
+
+      pollIntervalMs: 500
+      batchSize: 100
+      skipDelayOnFullBatch: true
+
+      customQuery: >
+        SELECT * FROM DATA_RECORDS t1
+        WHERE EXISTS (
+          SELECT 1 FROM BATCH_STATUS t2
+          WHERE t2.REFERENCE_DATE = t1.REFERENCE_DATE
+          AND   t2.BATCH_ID       = t1.BATCH_REF_ID
+        )
+
+      acknowledgementStrategy: CUSTOM
+      customAcknowledgementQuery: >
+        DELETE FROM DATA_RECORDS WHERE LOAD_ID = ?
+
+      rowMappingStrategy: CUSTOM
+
+      fieldMappings:
+        ENTITY_ID:
+          name: eventData.entityId
+          dataType: LONG
+        REFERENCE_DATE:
+          name: eventData.items.referenceDate
+          dataType: DATE
+          format: "yyyy-MM-dd"
+        BATCH_REF_ID:
+          name: eventData.items.batchId
+          dataType: LONG
+        DEFAULT_FLAG:
+          name: eventData.items.defaultFlag
+          dataType: BOOLEAN
+        DUPLICATE_FLAG:
+          name: eventData.items.duplicateFlag
+          dataType: BOOLEAN
+        AMOUNT:
+          name: eventData.items.amount
+          dataType: DECIMAL
+        LIABILITY_AMOUNT:
+          name: eventData.items.liabilityAmount
+          dataType: DECIMAL
+        LIABILITY_TS:
+          name: eventData.items.liabilityTs
+          dataType: DATETIME
+          format: "yyyy-MM-dd'T'HH:mm:ss"
+
+      staticFields:
+        eventType: "DataRequest.ItemsRequested"
+        # Constant company identifier – adjust as needed.
+        eventData.companyId: "1"
+
+    # ── Table 2: BATCH_STATUS ─────────────────────────────────────────────────
+    #
+    # Rows with fetched_flag = 0 are visible once no matching DATA_RECORDS
+    # rows remain (NOT EXISTS join).  After publishing, fetched_flag is set
+    # to 1 and the current timestamp is written to fetched_at.
+    # ─────────────────────────────────────────────────────────────────────────
+    - tableName: BATCH_STATUS
+
+      idColumn: BATCH_ID
+      keyColumn: BATCH_ID
+
+      staticTopic: batch-status
+
+      pollIntervalMs: 500
+      batchSize: 100
+
+      customQuery: >
+        SELECT * FROM BATCH_STATUS t1
+        WHERE t1.FETCHED_FLAG = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM DATA_RECORDS t2
+          WHERE t2.REFERENCE_DATE = t1.REFERENCE_DATE
+          AND   t2.BATCH_REF_ID   = t1.BATCH_ID
+        )
+
+      acknowledgementStrategy: CUSTOM
+      customAcknowledgementQuery: >
+        UPDATE BATCH_STATUS
+        SET FETCHED_FLAG = 1,
+            FETCHED_AT = CURRENT_TIMESTAMP
+        WHERE BATCH_ID = ?
+
+      rowMappingStrategy: CUSTOM
+
+      fieldMappings:
+        RECORD_COUNT:
+          name: eventData.recordCount
+          dataType: LONG
+        REFERENCE_DATE:
+          name: eventData.referenceDate
+          dataType: DATE
+          format: "yyyy-MM-dd"
+        BATCH_ID:
+          name: eventData.batchId
+          dataType: LONG
+
+      staticFields:
+        eventType: "BatchStatus.BatchInfoProvided"
+
+logging:
+  level:
+    org.apache.kafka.clients: WARN
