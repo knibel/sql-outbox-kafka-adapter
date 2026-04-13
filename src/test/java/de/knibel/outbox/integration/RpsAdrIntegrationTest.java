@@ -158,6 +158,11 @@ class RpsAdrIntegrationTest {
     /** Generates unique IDs per test run to avoid cross-test interference. */
     private static final AtomicLong ID_SEQUENCE = new AtomicLong(1_000_000);
 
+    /** Returns a unique string ID backed by an incrementing counter. */
+    private static String nextId() {
+        return String.valueOf(ID_SEQUENCE.getAndIncrement());
+    }
+
     @DynamicPropertySource
     static void overrideProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url",      postgres::getJdbcUrl);
@@ -219,9 +224,9 @@ class RpsAdrIntegrationTest {
      */
     @Test
     void shouldProcessAdrRowsThenPublishBatchlaufStatus() {
-        long batchId  = ID_SEQUENCE.getAndIncrement();
-        long adrId1   = ID_SEQUENCE.getAndIncrement();
-        long adrId2   = ID_SEQUENCE.getAndIncrement();
+        String batchId = nextId();
+        String adrId1  = nextId();
+        String adrId2  = nextId();
 
         // Insert status row – not yet collected, two ADR records expected
         jdbcTemplate.update(
@@ -286,8 +291,8 @@ class RpsAdrIntegrationTest {
     @Test
     @SuppressWarnings("unchecked")
     void shouldProduceBerechnungAnfragePayloadWithCorrectStructure() throws Exception {
-        long batchId = ID_SEQUENCE.getAndIncrement();
-        long adrId   = ID_SEQUENCE.getAndIncrement();
+        String batchId = nextId();
+        String adrId   = nextId();
 
         jdbcTemplate.update(
                 "INSERT INTO rps_adr_status (dwh_job_id_batch, stichtag_dat, anz_adr, daten_abgeholt_jn) "
@@ -335,7 +340,9 @@ class RpsAdrIntegrationTest {
         assertThat(bestandsKunden).isNotNull();
 
         assertThat(bestandsKunden.get("stichtag")).isEqualTo("2024-06-15");
-        assertThat(((Number) bestandsKunden.get("ext_job_id")).longValue()).isEqualTo(batchId);
+        // ext_job_id is VARCHAR in the test schema; LONG dataType converts it to a number
+        assertThat(((Number) bestandsKunden.get("ext_job_id")).longValue())
+                .isEqualTo(Long.parseLong(batchId));
         assertThat(bestandsKunden.get("ausfallflag")).isEqualTo(true);
         assertThat(bestandsKunden.get("doppelkunde")).isEqualTo(false);
         assertThat(((Number) bestandsKunden.get("umsatz")).doubleValue()).isEqualTo(4200.00);
@@ -350,7 +357,7 @@ class RpsAdrIntegrationTest {
     @Test
     @SuppressWarnings("unchecked")
     void shouldProduceBatchlaufStatusPayloadWithCorrectStructure() throws Exception {
-        long batchId = ID_SEQUENCE.getAndIncrement();
+        String batchId = nextId();
 
         // Insert a STATUS row with no ADR rows – immediately visible to poller 2
         jdbcTemplate.update(
@@ -372,7 +379,7 @@ class RpsAdrIntegrationTest {
         assertThat(received).hasSize(1);
 
         // Kafka message key is the batch job ID
-        assertThat(received.get(0).key()).isEqualTo(String.valueOf(batchId));
+        assertThat(received.get(0).key()).isEqualTo(batchId);
 
         Map<String, Object> payload = objectMapper.readValue(received.get(0).value(), Map.class);
 
@@ -385,7 +392,9 @@ class RpsAdrIntegrationTest {
 
         assertThat(((Number) ereignisdaten.get("anzahlEintraege")).longValue()).isEqualTo(42L);
         assertThat(ereignisdaten.get("stichtag")).isEqualTo("2024-09-30");
-        assertThat(((Number) ereignisdaten.get("extJobId")).longValue()).isEqualTo(batchId);
+        // dwh_job_id_batch is VARCHAR; LONG dataType converts it to a number
+        assertThat(((Number) ereignisdaten.get("extJobId")).longValue())
+                .isEqualTo(Long.parseLong(batchId));
     }
 
     /**
@@ -394,8 +403,8 @@ class RpsAdrIntegrationTest {
      */
     @Test
     void shouldNotPublishAdrRowsWithoutMatchingStatus() {
-        long batchId = ID_SEQUENCE.getAndIncrement();
-        long adrId   = ID_SEQUENCE.getAndIncrement();
+        String batchId = nextId();
+        String adrId   = nextId();
 
         // Insert ADR row – no STATUS entry → EXISTS condition is false
         jdbcTemplate.update(

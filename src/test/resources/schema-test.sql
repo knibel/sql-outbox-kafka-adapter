@@ -68,10 +68,14 @@ CREATE TABLE IF NOT EXISTS static_fields_outbox (
 
 -- Tables for RPS_ADR / RPS_ADR_STATUS integration test
 -- (replacing RpsAdrRepository / RpsAdrStatusRepository with the adapter)
+-- ext_load_id and ext_job_id are VARCHAR so that the adapter's String-typed
+-- id bind parameter is compatible with PostgreSQL's strict type system.
+-- In Oracle (the production DB), NUMBER columns accept VARCHAR bind parameters
+-- via implicit casting, so the production config keeps numeric column types.
 CREATE TABLE IF NOT EXISTS rps_adr (
-    ext_load_id           BIGINT        PRIMARY KEY,
+    ext_load_id           VARCHAR(36)   PRIMARY KEY,
     bk_stichtag_dat       DATE          NOT NULL,
-    ext_job_id            BIGINT        NOT NULL,
+    ext_job_id            VARCHAR(36)   NOT NULL,
     bk_adr_nummer         BIGINT        NOT NULL,
     kunde_ausgefallen_knz BOOLEAN       DEFAULT FALSE,
     doppelkunde_knz       BOOLEAN       DEFAULT FALSE,
@@ -80,8 +84,9 @@ CREATE TABLE IF NOT EXISTS rps_adr (
     kne_obligo_ts         TIMESTAMP
 );
 
+-- dwh_job_id_batch is VARCHAR for the same reason as above.
 CREATE TABLE IF NOT EXISTS rps_adr_status (
-    dwh_job_id_batch    BIGINT        PRIMARY KEY,
+    dwh_job_id_batch    VARCHAR(36)   PRIMARY KEY,
     stichtag_dat        DATE          NOT NULL,
     anz_adr             BIGINT,
     daten_abgeholt_jn   INTEGER       NOT NULL DEFAULT 0,
