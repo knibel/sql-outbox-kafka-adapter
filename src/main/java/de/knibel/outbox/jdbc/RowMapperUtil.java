@@ -222,6 +222,11 @@ public final class RowMapperUtil {
 
         // Step 2: Apply pattern-based mappings to columns not already explicitly mapped
         if (columnPatterns != null && !columnPatterns.isEmpty()) {
+            // Compile patterns once before iterating rows
+            Map<Pattern, FieldMapping> compiledPatterns = new LinkedHashMap<>();
+            for (Map.Entry<String, FieldMapping> patternEntry : columnPatterns.entrySet()) {
+                compiledPatterns.put(Pattern.compile(patternEntry.getKey()), patternEntry.getValue());
+            }
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
             for (int i = 1; i <= columnCount; i++) {
@@ -229,12 +234,11 @@ public final class RowMapperUtil {
                 if (explicitColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                     continue;
                 }
-                for (Map.Entry<String, FieldMapping> patternEntry : columnPatterns.entrySet()) {
-                    Pattern pattern = Pattern.compile(patternEntry.getKey());
-                    Matcher matcher = pattern.matcher(columnName);
+                for (Map.Entry<Pattern, FieldMapping> compiledEntry : compiledPatterns.entrySet()) {
+                    Matcher matcher = compiledEntry.getKey().matcher(columnName);
                     if (matcher.matches()) {
-                        FieldMapping template = patternEntry.getValue();
-                        String targetName = pattern.matcher(columnName).replaceAll(template.getName());
+                        FieldMapping template = compiledEntry.getValue();
+                        String targetName = matcher.replaceAll(template.getName());
                         Object value = rs.getObject(i);
                         Object mapped = applyValueMapping(value, template.getValueMappings());
                         Object converted = convertValue(mapped, template.getDataType(), template.getFormat());
