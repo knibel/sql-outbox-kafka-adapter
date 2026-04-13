@@ -330,7 +330,7 @@ class RpsAdrIntegrationTest {
         Map<String, Object> ereignisdaten = (Map<String, Object>) payload.get("ereignisdaten");
         assertThat(ereignisdaten).isNotNull();
 
-        // Static field: company identifier
+        // Static field: company identifier (always serialised as JSON string by the adapter)
         assertThat(ereignisdaten.get("firma")).isEqualTo("1");
 
         // Column-derived field: customer ID
