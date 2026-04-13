@@ -3,6 +3,7 @@ package de.knibel.outbox.jdbc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.FieldMapping;
+import de.knibel.outbox.config.ListMapping;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -520,5 +522,278 @@ class RowMapperUtilTest {
 
         Map<String, Object> neu = (Map<String, Object>) payload.get("neu");
         assertThat(neu).isNotNull().containsEntry("adresse_stadt", "Berlin");
+    }
+
+    // ── buildCustomPayload with listMappings ─────────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_listMapping_groupsColumnsByCapture() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(4);
+        when(meta.getColumnLabel(1)).thenReturn("new_price");
+        when(meta.getColumnLabel(2)).thenReturn("old_price");
+        when(meta.getColumnLabel(3)).thenReturn("new_stock");
+        when(meta.getColumnLabel(4)).thenReturn("old_stock");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn(10.0);
+        when(rs.getObject(2)).thenReturn(8.0);
+        when(rs.getObject(3)).thenReturn(100);
+        when(rs.getObject(4)).thenReturn(50);
+
+        FieldMapping afterMapping = new FieldMapping();
+        afterMapping.setName("after");
+        FieldMapping beforeMapping = new FieldMapping();
+        beforeMapping.setName("before");
+
+        ListMapping listMapping = new ListMapping();
+        listMapping.setKeyProperty("attribute");
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        patterns.put("old_(.*)", beforeMapping);
+        listMapping.setPatterns(patterns);
+
+        Map<String, ListMapping> listMappings = Map.of("modifications", listMapping);
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs, Map.of(), Map.of(), listMappings, new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        List<Map<String, Object>> modifications = (List<Map<String, Object>>) payload.get("modifications");
+        assertThat(modifications).hasSize(2);
+
+        Map<String, Object> priceEntry = modifications.get(0);
+        assertThat(priceEntry.get("attribute")).isEqualTo("price");
+        assertThat(priceEntry.get("after")).isEqualTo(10.0);
+        assertThat(priceEntry.get("before")).isEqualTo(8.0);
+
+        Map<String, Object> stockEntry = modifications.get(1);
+        assertThat(stockEntry.get("attribute")).isEqualTo("stock");
+        assertThat(stockEntry.get("after")).isEqualTo(100);
+        assertThat(stockEntry.get("before")).isEqualTo(50);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_listMapping_withoutKeyProperty() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("new_price");
+        when(meta.getColumnLabel(2)).thenReturn("old_price");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn(10.0);
+        when(rs.getObject(2)).thenReturn(8.0);
+
+        FieldMapping afterMapping = new FieldMapping();
+        afterMapping.setName("after");
+        FieldMapping beforeMapping = new FieldMapping();
+        beforeMapping.setName("before");
+
+        ListMapping listMapping = new ListMapping();
+        // no keyProperty set
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        patterns.put("old_(.*)", beforeMapping);
+        listMapping.setPatterns(patterns);
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs, Map.of(), Map.of(), Map.of("items", listMapping), new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        List<Map<String, Object>> items = (List<Map<String, Object>>) payload.get("items");
+        assertThat(items).hasSize(1);
+        // No keyProperty, so no "price" key in the element
+        assertThat(items.get(0)).doesNotContainKey("price");
+        assertThat(items.get(0).get("after")).isEqualTo(10.0);
+        assertThat(items.get(0).get("before")).isEqualTo(8.0);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_listMapping_withDataTypeConversion() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("new_amount");
+        when(meta.getColumnLabel(2)).thenReturn("old_amount");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn(new BigDecimal("99.95"));
+        when(rs.getObject(2)).thenReturn(new BigDecimal("88.50"));
+
+        FieldMapping afterMapping = new FieldMapping("after", FieldDataType.DOUBLE);
+        FieldMapping beforeMapping = new FieldMapping("before", FieldDataType.DOUBLE);
+
+        ListMapping listMapping = new ListMapping();
+        listMapping.setKeyProperty("field");
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        patterns.put("old_(.*)", beforeMapping);
+        listMapping.setPatterns(patterns);
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs, Map.of(), Map.of(), Map.of("changes", listMapping), new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        List<Map<String, Object>> changes = (List<Map<String, Object>>) payload.get("changes");
+        assertThat(changes).hasSize(1);
+        assertThat(changes.get(0).get("field")).isEqualTo("amount");
+        assertThat(changes.get(0).get("after")).isEqualTo(99.95);
+        assertThat(changes.get(0).get("before")).isEqualTo(88.5);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_listMapping_withValueMappings() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("new_status");
+        when(meta.getColumnLabel(2)).thenReturn("old_status");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn(1);
+        when(rs.getObject(2)).thenReturn(2);
+
+        FieldMapping afterMapping = new FieldMapping();
+        afterMapping.setName("after");
+        afterMapping.setValueMappings(Map.of("1", "ACTIVE", "2", "INACTIVE"));
+        FieldMapping beforeMapping = new FieldMapping();
+        beforeMapping.setName("before");
+        beforeMapping.setValueMappings(Map.of("1", "ACTIVE", "2", "INACTIVE"));
+
+        ListMapping listMapping = new ListMapping();
+        listMapping.setKeyProperty("field");
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        patterns.put("old_(.*)", beforeMapping);
+        listMapping.setPatterns(patterns);
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs, Map.of(), Map.of(), Map.of("changes", listMapping), new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        List<Map<String, Object>> changes = (List<Map<String, Object>>) payload.get("changes");
+        assertThat(changes).hasSize(1);
+        assertThat(changes.get(0).get("after")).isEqualTo("ACTIVE");
+        assertThat(changes.get(0).get("before")).isEqualTo("INACTIVE");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_listMapping_fieldMappingsTakePrecedence() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(3);
+        when(meta.getColumnLabel(1)).thenReturn("new_price");
+        when(meta.getColumnLabel(2)).thenReturn("old_price");
+        when(meta.getColumnLabel(3)).thenReturn("new_name");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject("new_name")).thenReturn("explicit_value");
+        when(rs.getObject(1)).thenReturn(10.0);
+        when(rs.getObject(2)).thenReturn(8.0);
+        when(rs.getObject(3)).thenReturn("pattern_value");
+
+        // Explicit mapping for new_name
+        FieldMapping explicitMapping = new FieldMapping();
+        explicitMapping.setName("productName");
+
+        FieldMapping afterMapping = new FieldMapping();
+        afterMapping.setName("after");
+        FieldMapping beforeMapping = new FieldMapping();
+        beforeMapping.setName("before");
+
+        ListMapping listMapping = new ListMapping();
+        listMapping.setKeyProperty("field");
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        patterns.put("old_(.*)", beforeMapping);
+        listMapping.setPatterns(patterns);
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs,
+                Map.of("new_name", explicitMapping),
+                Map.of(),
+                Map.of("changes", listMapping),
+                new ObjectMapper(),
+                Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        // Explicit mapping wins
+        assertThat(payload.get("productName")).isEqualTo("explicit_value");
+
+        // List should only contain price (name was handled by explicit mapping)
+        List<Map<String, Object>> changes = (List<Map<String, Object>>) payload.get("changes");
+        assertThat(changes).hasSize(1);
+        assertThat(changes.get(0).get("field")).isEqualTo("price");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_listMapping_atNestedPath() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("new_x");
+        when(meta.getColumnLabel(2)).thenReturn("old_x");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn("new_val");
+        when(rs.getObject(2)).thenReturn("old_val");
+
+        FieldMapping afterMapping = new FieldMapping();
+        afterMapping.setName("after");
+        FieldMapping beforeMapping = new FieldMapping();
+        beforeMapping.setName("before");
+
+        ListMapping listMapping = new ListMapping();
+        listMapping.setKeyProperty("field");
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        patterns.put("old_(.*)", beforeMapping);
+        listMapping.setPatterns(patterns);
+
+        // Target path is nested: data.changes
+        String json = RowMapperUtil.buildCustomPayload(
+                rs, Map.of(), Map.of(), Map.of("data.changes", listMapping), new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        Map<String, Object> data = (Map<String, Object>) payload.get("data");
+        assertThat(data).isNotNull();
+        List<Map<String, Object>> changes = (List<Map<String, Object>>) data.get("changes");
+        assertThat(changes).hasSize(1);
+        assertThat(changes.get(0).get("field")).isEqualTo("x");
+    }
+
+    @Test
+    void buildCustomPayload_listMapping_nonMatchingColumnsProduceEmptyList() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("id");
+        when(meta.getColumnLabel(2)).thenReturn("status");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn("123");
+        when(rs.getObject(2)).thenReturn("PENDING");
+
+        FieldMapping afterMapping = new FieldMapping();
+        afterMapping.setName("after");
+        ListMapping listMapping = new ListMapping();
+        listMapping.setKeyProperty("field");
+        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put("new_(.*)", afterMapping);
+        listMapping.setPatterns(patterns);
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs, Map.of(), Map.of(), Map.of("changes", listMapping), new ObjectMapper(), Map.of());
+
+        // No columns matched the list patterns, so "changes" should not appear
+        assertThat(json).isEqualTo("{}");
     }
 }

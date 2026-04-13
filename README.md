@@ -85,13 +85,14 @@ Controls how SQL row columns are mapped to the Kafka record value (payload).
 |---|---|
 | `PAYLOAD_COLUMN` _(default)_ | Reads a pre-serialized JSON string from `payloadColumn`. |
 | `TO_CAMEL_CASE` | Selects all columns and converts each `snake_case` column name to `camelCase` in the resulting JSON payload. No `payloadColumn` needed. |
-| `CUSTOM` | Uses the explicit `fieldMappings` and/or regex-based `columnPatterns` to map source columns to target JSON fields. Supports nested objects via dot-separated paths, data type conversion, date/datetime formatting, and value mapping. |
+| `CUSTOM` | Uses the explicit `fieldMappings` and/or regex-based `columnPatterns` and/or `listMappings` to map source columns to target JSON fields. Supports nested objects via dot-separated paths, data type conversion, date/datetime formatting, value mapping, and collecting column groups into JSON arrays. |
 
 | Property | Default | Description |
 |---|---|---|
 | `rowMappingStrategy` | `PAYLOAD_COLUMN` | One of `PAYLOAD_COLUMN`, `TO_CAMEL_CASE`, `CUSTOM`. |
-| `fieldMappings` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of source SQL column names to field mapping objects. At least one of `fieldMappings` or `columnPatterns` must be non-empty. |
-| `columnPatterns` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of Java regex patterns to field mapping objects. Each pattern is matched against the full column label; the `name` may contain back-references (`$1`, `$2`, …). Explicit `fieldMappings` take precedence over patterns. At least one of `fieldMappings` or `columnPatterns` must be non-empty. |
+| `fieldMappings` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of source SQL column names to field mapping objects. At least one of `fieldMappings`, `columnPatterns`, or `listMappings` must be non-empty. |
+| `columnPatterns` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of Java regex patterns to field mapping objects. Each pattern is matched against the full column label; the `name` may contain back-references (`$1`, `$2`, …). Explicit `fieldMappings` take precedence over patterns. At least one of `fieldMappings`, `columnPatterns`, or `listMappings` must be non-empty. |
+| `listMappings` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of target JSON paths to list-mapping objects. Collects columns matching regex patterns into JSON arrays, grouped by the first capturing group. See below for details. At least one of `fieldMappings`, `columnPatterns`, or `listMappings` must be non-empty. |
 
 ##### Field mapping properties (`fieldMappings.<column>` and `columnPatterns.<pattern>`)
 
@@ -99,10 +100,24 @@ Entries in both `fieldMappings` and `columnPatterns` share the same mapping prop
 
 | Property | Required | Description |
 |---|---|---|
-| `name` | **yes** | Target JSON field path. Dot-separated paths produce nested objects (e.g. `customer.address.city`). In `columnPatterns`, back-references (`$1`, `$2`, …) may be used to incorporate captured groups from the pattern. |
+| `name` | **yes** | Target JSON field path. Dot-separated paths produce nested objects (e.g. `customer.address.city`). In `columnPatterns`, back-references (`$1`, `$2`, …) may be used to incorporate captured groups from the pattern. In `listMappings`, this is the property name within each array element. |
 | `dataType` | no | Target data type for conversion. One of: `STRING`, `INTEGER`, `LONG`, `DOUBLE`, `BOOLEAN`, `DECIMAL`, `DATE`, `DATETIME`. When omitted, the JDBC driver's default Java mapping is used. |
 | `format` | when `dataType` is `DATE` or `DATETIME` | A `DateTimeFormatter` pattern (e.g. `yyyy-MM-dd`, `yyyy-MM-dd'T'HH:mm:ss`). Accepts `java.sql.Date`, `java.sql.Timestamp`, `LocalDate`, `LocalDateTime`, `Instant`, and `java.util.Date`. |
 | `valueMappings` | no | A map of raw database values (as strings) to replacement output values. Applied _before_ `dataType` conversion. Useful for translating integer codes to enum strings (e.g. `"1": ACTIVE`). Unmapped values pass through unchanged. |
+
+##### List mapping properties (`listMappings.<targetPath>`)
+
+Each entry in `listMappings` collects columns matching regex patterns into a
+JSON array at the specified target path.  Columns sharing the same first
+capturing-group value are merged into one array element.
+
+| Property | Required | Description |
+|---|---|---|
+| `keyProperty` | no | Property name in each array element whose value is the first capturing-group match (i.e. the column-name suffix). When omitted, the captured group is used only for grouping and is not included as a property. |
+| `patterns` | **yes** | A map of Java regex patterns to field mapping objects.  Each pattern must contain at least one capturing group.  The first group determines which array element the column value belongs to.  The `name` in the mapping specifies the property name within that element.  `dataType`, `format`, and `valueMappings` are supported. |
+
+Precedence: `fieldMappings` > `columnPatterns` > `listMappings`.  A column
+already handled by a higher-precedence mapping is excluded from list processing.
 
 #### Acknowledgement strategy
 
@@ -480,3 +495,77 @@ fieldMappings:
     name: specialPrice   # explicit mapping wins for this column
     dataType: DOUBLE
 ```
+
+### CUSTOM row mapping with list mappings (paired columns → JSON array)
+
+Use `listMappings` to collect groups of paired columns into a JSON array.
+Each unique first capturing-group value produces one array element.  This
+is ideal for tables with paired prefix columns (e.g. `new_*`/`old_*`):
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: product_audit
+      staticTopic: product-audit
+      rowMappingStrategy: CUSTOM
+      fieldMappings:
+        audit_ts:
+          name: timestamp
+          dataType: DATETIME
+          format: "yyyy-MM-dd'T'HH:mm:ss"
+        action:
+          name: action
+          valueMappings:
+            "I": INSERT
+            "U": UPDATE
+            "D": DELETE
+        product_key:
+          name: productKey
+      listMappings:
+        modifications:
+          keyProperty: attribute
+          patterns:
+            "new_(.*)":
+              name: after
+            "old_(.*)":
+              name: before
+```
+
+```sql
+CREATE TABLE product_audit (
+    audit_id        VARCHAR(36)   PRIMARY KEY,
+    audit_ts        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    action          CHAR(1)       NOT NULL DEFAULT 'U',
+    product_key     VARCHAR(100)  NOT NULL,
+    new_price       NUMERIC(10,2),
+    old_price       NUMERIC(10,2),
+    new_stock       INTEGER,
+    old_stock       INTEGER,
+    new_label       VARCHAR(200),
+    old_label       VARCHAR(200),
+    status          VARCHAR(20)   NOT NULL DEFAULT 'PENDING'
+);
+```
+
+A row with `action='U'`, `product_key='SKU-42'`, `new_price=29.99`,
+`old_price=24.99`, `new_stock=150`, `old_stock=100` produces:
+
+```json
+{
+  "timestamp": "2024-03-15T10:30:00",
+  "action": "UPDATE",
+  "productKey": "SKU-42",
+  "modifications": [
+    {"attribute": "price", "after": 29.99, "before": 24.99},
+    {"attribute": "stock", "after": 150,   "before": 100},
+    {"attribute": "label", "after": "Widget Pro", "before": "Widget"}
+  ]
+}
+```
+
+You can combine `listMappings` with `fieldMappings` and `columnPatterns`.
+Precedence order: `fieldMappings` > `columnPatterns` > `listMappings`.
+A column already handled by a higher-precedence mapping is excluded from
+list processing.

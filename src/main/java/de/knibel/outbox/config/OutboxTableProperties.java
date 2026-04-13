@@ -177,6 +177,44 @@ public class OutboxTableProperties {
     private transient volatile Map<Pattern, FieldMapping> compiledColumnPatterns;
 
     /**
+     * List-building mappings, used only when
+     * {@code rowMappingStrategy} is {@link RowMappingStrategy#CUSTOM}.
+     *
+     * <p>Keys are target JSON paths where the resulting array is placed
+     * (dot-separated paths produce nested objects just like
+     * {@link FieldMapping#getName()}).  Values are {@link ListMapping}
+     * objects that define regex patterns for collecting columns into
+     * array elements.
+     *
+     * <p>Columns already handled by {@code fieldMappings} or
+     * {@code columnPatterns} are excluded from list mapping.  Within a
+     * list mapping, each column is matched against the patterns; columns
+     * sharing the same first capturing-group value are merged into one
+     * array element.
+     *
+     * <p>Example:
+     * <pre>
+     *   listMappings:
+     *     modifications:
+     *       keyProperty: attribute
+     *       patterns:
+     *         "new_(.*)":
+     *           name: after
+     *         "old_(.*)":
+     *           name: before
+     * </pre>
+     * Given columns {@code new_price=10.0}, {@code old_price=8.0},
+     * {@code new_stock=100}, {@code old_stock=50} produces:
+     * <pre>
+     * "modifications": [
+     *   {"attribute":"price","after":10.0,"before":8.0},
+     *   {"attribute":"stock","after":100,"before":50}
+     * ]
+     * </pre>
+     */
+    private Map<String, ListMapping> listMappings = new LinkedHashMap<>();
+
+    /**
      * Static key-value pairs injected into every JSON payload.
      *
      * <p>Used together with {@link RowMappingStrategy#CUSTOM CUSTOM} or
@@ -374,6 +412,9 @@ public class OutboxTableProperties {
 
     public Map<String, String> getStaticFields() { return staticFields; }
     public void setStaticFields(Map<String, String> staticFields) { this.staticFields = staticFields; }
+
+    public Map<String, ListMapping> getListMappings() { return listMappings; }
+    public void setListMappings(Map<String, ListMapping> listMappings) { this.listMappings = listMappings; }
 
     public String getCustomAcknowledgementQuery() { return customAcknowledgementQuery; }
     public void setCustomAcknowledgementQuery(String customAcknowledgementQuery) { this.customAcknowledgementQuery = customAcknowledgementQuery; }

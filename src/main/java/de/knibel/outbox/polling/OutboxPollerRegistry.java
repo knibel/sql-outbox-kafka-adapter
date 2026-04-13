@@ -3,6 +3,7 @@ package de.knibel.outbox.polling;
 import de.knibel.outbox.config.AcknowledgementStrategy;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.FieldMapping;
+import de.knibel.outbox.config.ListMapping;
 import de.knibel.outbox.config.OutboxProperties;
 import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.config.RowMappingStrategy;
@@ -267,10 +268,11 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             if (rowMapping == RowMappingStrategy.CUSTOM) {
                 boolean hasFieldMappings = cfg.getFieldMappings() != null && !cfg.getFieldMappings().isEmpty();
                 boolean hasColumnPatterns = cfg.getColumnPatterns() != null && !cfg.getColumnPatterns().isEmpty();
-                if (!hasFieldMappings && !hasColumnPatterns) {
+                boolean hasListMappings = cfg.getListMappings() != null && !cfg.getListMappings().isEmpty();
+                if (!hasFieldMappings && !hasColumnPatterns && !hasListMappings) {
                     throw new IllegalArgumentException(
                             "Table '" + name + "': rowMappingStrategy=CUSTOM requires non-empty "
-                            + "'fieldMappings' or 'columnPatterns'");
+                            + "'fieldMappings', 'columnPatterns', or 'listMappings'");
                 }
                 if (hasFieldMappings) {
                     for (var entry : cfg.getFieldMappings().entrySet()) {
@@ -320,6 +322,56 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                                     "Table '" + name + "': columnPatterns entry for pattern '"
                                     + patternKey + "' with dataType=" + dt
                                     + " requires a non-blank 'format' pattern");
+                        }
+                    }
+                }
+                if (hasListMappings) {
+                    for (var listEntry : cfg.getListMappings().entrySet()) {
+                        String targetPath = listEntry.getKey();
+                        if (targetPath == null || targetPath.isBlank()) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': listMappings key (target path) must not be blank");
+                        }
+                        ListMapping listMapping = listEntry.getValue();
+                        if (listMapping == null) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': listMappings entry for path '"
+                                    + targetPath + "' must not be null");
+                        }
+                        if (listMapping.getPatterns() == null || listMapping.getPatterns().isEmpty()) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': listMappings entry for path '"
+                                    + targetPath + "' must have non-empty 'patterns'");
+                        }
+                        for (var patEntry : listMapping.getPatterns().entrySet()) {
+                            String patternKey = patEntry.getKey();
+                            if (patternKey == null || patternKey.isBlank()) {
+                                throw new IllegalArgumentException(
+                                        "Table '" + name + "': listMappings[" + targetPath
+                                        + "] pattern key must not be blank");
+                            }
+                            try {
+                                Pattern.compile(patternKey);
+                            } catch (PatternSyntaxException e) {
+                                throw new IllegalArgumentException(
+                                        "Table '" + name + "': listMappings[" + targetPath
+                                        + "] pattern key '" + patternKey
+                                        + "' is not a valid regular expression: " + e.getMessage(), e);
+                            }
+                            FieldMapping mapping = patEntry.getValue();
+                            if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
+                                throw new IllegalArgumentException(
+                                        "Table '" + name + "': listMappings[" + targetPath
+                                        + "] pattern '" + patternKey + "' must have a non-blank 'name'");
+                            }
+                            FieldDataType dt = mapping.getDataType();
+                            if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
+                                    && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
+                                throw new IllegalArgumentException(
+                                        "Table '" + name + "': listMappings[" + targetPath
+                                        + "] pattern '" + patternKey + "' with dataType=" + dt
+                                        + " requires a non-blank 'format' pattern");
+                            }
                         }
                     }
                 }

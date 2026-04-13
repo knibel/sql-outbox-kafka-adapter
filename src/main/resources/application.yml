@@ -172,6 +172,24 @@ outbox:
       #     customer_email:
       #       name: customer.email
       # Produces: {"orderId":"…","totalAmount":99.95,"createdAt":"2024-01-15T10:30:00","status":"ACTIVE","customer":{"name":"…","email":"…"}}
+
+      # ── List mapping (CUSTOM only) ─────────────────────────────────────
+      # Collects groups of columns matching regex patterns into a JSON
+      # array at the specified target path.  Columns sharing the same
+      # first capturing-group value are merged into one array element.
+      # Keys are target JSON paths; values have:
+      #   - keyProperty: (optional) property name for the captured group
+      #   - patterns: regex-pattern → field mapping
+      # Example:
+      #   listMappings:
+      #     modifications:
+      #       keyProperty: attribute
+      #       patterns:
+      #         "new_(.*)":
+      #           name: after
+      #         "old_(.*)":
+      #           name: before
+      # Produces: {"modifications":[{"attribute":"price","after":10.0,"before":8.0},…]}
 logging:
   level:
     org.apache.kafka.clients: WARN
