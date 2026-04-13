@@ -24,7 +24,7 @@ public class CustomFieldPayloadMapper implements PayloadMapper {
     public String mapPayload(ResultSet rs, OutboxTableProperties config) throws SQLException {
         try {
             return RowMapperUtil.buildCustomPayload(
-                    rs, config.getFieldMappings(), config.getColumnPatterns(),
+                    rs, config.getFieldMappings(), config.getCompiledColumnPatterns(),
                     objectMapper, config.getStaticFields());
         } catch (Exception e) {
             throw new SQLException("Failed to build custom payload", e);

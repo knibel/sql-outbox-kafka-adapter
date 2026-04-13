@@ -176,33 +176,33 @@ public final class RowMapperUtil {
 
     /**
      * Reads columns from the current result-set row using both explicit
-     * {@code fieldMappings} and regex-based {@code columnPatterns}, builds a
-     * (possibly nested) JSON object, and then applies any {@code staticFields}.
+     * {@code fieldMappings} and pre-compiled regex-based {@code columnPatterns},
+     * builds a (possibly nested) JSON object, and then applies any
+     * {@code staticFields}.
      *
      * <p>Explicit {@code fieldMappings} are processed first and always take
      * precedence: a column already covered by an explicit mapping is skipped
      * when evaluating {@code columnPatterns}.
      *
-     * <p>Each key in {@code columnPatterns} is a Java regular-expression
-     * pattern matched against the full column label
-     * (via {@link Matcher#matches()}).  The {@code name} in the corresponding
-     * {@link FieldMapping} may contain back-references ({@code $1}, {@code $2},
-     * …) that are resolved against the capturing groups of the matched column
-     * name.
+     * <p>Each {@link Pattern} key in {@code columnPatterns} is matched against
+     * the full column label (via {@link Matcher#matches()}).  The {@code name}
+     * in the corresponding {@link FieldMapping} may contain back-references
+     * ({@code $1}, {@code $2}, …) that are resolved against the capturing
+     * groups of the matched column name.
      *
      * <p>Example: pattern {@code "neu_(.*)"} with name {@code "neu.$1"}
      * maps column {@code neu_preis} to JSON path {@code neu.preis}.
      *
-     * @param rs             positioned result-set row
-     * @param fieldMappings  explicit source-column → {@link FieldMapping} mapping
-     * @param columnPatterns regex-pattern → {@link FieldMapping} template mapping
-     * @param objectMapper   Jackson mapper for serialization
-     * @param staticFields   constant key-value pairs to inject (may be empty)
+     * @param rs              positioned result-set row
+     * @param fieldMappings   explicit source-column → {@link FieldMapping} mapping
+     * @param columnPatterns  pre-compiled regex-pattern → {@link FieldMapping} template mapping
+     * @param objectMapper    Jackson mapper for serialization
+     * @param staticFields    constant key-value pairs to inject (may be empty)
      * @return JSON string representing the mapped payload
      */
     public static String buildCustomPayload(ResultSet rs,
                                             Map<String, FieldMapping> fieldMappings,
-                                            Map<String, FieldMapping> columnPatterns,
+                                            Map<Pattern, FieldMapping> columnPatterns,
                                             ObjectMapper objectMapper,
                                             Map<String, String> staticFields)
             throws SQLException, JsonProcessingException {
@@ -222,11 +222,6 @@ public final class RowMapperUtil {
 
         // Step 2: Apply pattern-based mappings to columns not already explicitly mapped
         if (columnPatterns != null && !columnPatterns.isEmpty()) {
-            // Compile patterns once before iterating rows
-            Map<Pattern, FieldMapping> compiledPatterns = new LinkedHashMap<>();
-            for (Map.Entry<String, FieldMapping> patternEntry : columnPatterns.entrySet()) {
-                compiledPatterns.put(Pattern.compile(patternEntry.getKey()), patternEntry.getValue());
-            }
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
             for (int i = 1; i <= columnCount; i++) {
@@ -234,7 +229,7 @@ public final class RowMapperUtil {
                 if (explicitColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                     continue;
                 }
-                for (Map.Entry<Pattern, FieldMapping> compiledEntry : compiledPatterns.entrySet()) {
+                for (Map.Entry<Pattern, FieldMapping> compiledEntry : columnPatterns.entrySet()) {
                     Matcher matcher = compiledEntry.getKey().matcher(columnName);
                     if (matcher.matches()) {
                         FieldMapping template = compiledEntry.getValue();

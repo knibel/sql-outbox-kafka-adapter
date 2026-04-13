@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -402,8 +403,8 @@ class RowMapperUtilTest {
         FieldMapping patternMapping = new FieldMapping();
         patternMapping.setName("neu.$1");
 
-        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
-        patterns.put("neu_(.*)", patternMapping);
+        Map<Pattern, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put(Pattern.compile("neu_(.*)"), patternMapping);
 
         String json = RowMapperUtil.buildCustomPayload(rs, Map.of(), patterns, new ObjectMapper(), Map.of());
         Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
@@ -432,9 +433,9 @@ class RowMapperUtilTest {
         FieldMapping altMapping = new FieldMapping();
         altMapping.setName("alt.$1");
 
-        Map<String, FieldMapping> patterns = new LinkedHashMap<>();
-        patterns.put("neu_(.*)", neuMapping);
-        patterns.put("alt_(.*)", altMapping);
+        Map<Pattern, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put(Pattern.compile("neu_(.*)"), neuMapping);
+        patterns.put(Pattern.compile("alt_(.*)"), altMapping);
 
         String json = RowMapperUtil.buildCustomPayload(rs, Map.of(), patterns, new ObjectMapper(), Map.of());
         Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
@@ -467,7 +468,7 @@ class RowMapperUtilTest {
         String json = RowMapperUtil.buildCustomPayload(
                 rs,
                 Map.of("neu_preis", explicitMapping),
-                Map.of("neu_(.*)", patternMapping),
+                Map.of(Pattern.compile("neu_(.*)"), patternMapping),
                 new ObjectMapper(),
                 Map.of());
         Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
@@ -494,7 +495,7 @@ class RowMapperUtilTest {
         patternMapping.setName("neu.$1");
 
         String json = RowMapperUtil.buildCustomPayload(rs, Map.of(),
-                Map.of("neu_(.*)", patternMapping), new ObjectMapper(), Map.of());
+                Map.of(Pattern.compile("neu_(.*)"), patternMapping), new ObjectMapper(), Map.of());
 
         assertThat(json).isEqualTo("{}");
     }
@@ -514,7 +515,7 @@ class RowMapperUtilTest {
         patternMapping.setName("neu.$1");
 
         String json = RowMapperUtil.buildCustomPayload(rs, Map.of(),
-                Map.of("neu_(.*)", patternMapping), new ObjectMapper(), Map.of());
+                Map.of(Pattern.compile("neu_(.*)"), patternMapping), new ObjectMapper(), Map.of());
         Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
 
         Map<String, Object> neu = (Map<String, Object>) payload.get("neu");
