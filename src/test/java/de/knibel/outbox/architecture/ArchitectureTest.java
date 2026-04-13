@@ -6,6 +6,7 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import de.knibel.outbox.jdbc.rowmapper.PayloadMapper;
 import de.knibel.outbox.jdbc.selection.SelectionStrategy;
+import de.knibel.outbox.repository.AcknowledgementHandler;
 import de.knibel.outbox.transport.MessageTransport;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -64,6 +65,12 @@ class ArchitectureTest {
             classes().that().resideInAPackage("..jdbc.rowmapper..")
                     .and().areNotInterfaces()
                     .should().implement(PayloadMapper.class);
+
+    @ArchTest
+    static final ArchRule acknowledgement_handlers_implement_interface =
+            classes().that().resideInAPackage("..jdbc.acknowledgement..")
+                    .and().areNotInterfaces()
+                    .should().implement(AcknowledgementHandler.class);
 
     @ArchTest
     static final ArchRule kafka_transport_implements_message_transport =

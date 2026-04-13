@@ -9,24 +9,16 @@ import java.sql.SQLException;
  *
  * <p>Each implementation corresponds to a
  * {@link de.knibel.outbox.config.RowMappingStrategy} configuration option
- * and handles both the SELECT column list and the payload extraction.
+ * and defines how the payload is extracted from the result set.
+ *
+ * <p>All columns of the row are always selected ({@code SELECT *});
+ * the mapper only controls <em>how</em> columns are mapped to a JSON payload.
  *
  * @see PayloadColumnMapper
  * @see CamelCasePayloadMapper
  * @see CustomFieldPayloadMapper
  */
 public interface PayloadMapper {
-
-    /**
-     * Builds the comma-separated SELECT column list required by this mapper.
-     *
-     * <p>The list includes both metadata columns (id, key, topic, headers)
-     * and any payload-specific columns.
-     *
-     * @param config table-specific configuration
-     * @return the column list for the SQL SELECT clause
-     */
-    String buildSelectList(OutboxTableProperties config);
 
     /**
      * Maps the payload portion of the current result-set row to a JSON string.

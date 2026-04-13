@@ -16,7 +16,7 @@ import de.knibel.outbox.jdbc.SqlIdentifier;
 public class SimpleSelectionStrategy implements SelectionStrategy {
 
     @Override
-    public SelectionQuery buildClaimQuery(OutboxTableProperties config, String selectList) {
+    public SelectionQuery buildClaimQuery(OutboxTableProperties config) {
         String table = SqlIdentifier.quote(config.getTableName());
         String idCol = SqlIdentifier.quote(config.getIdColumn());
 
@@ -24,7 +24,7 @@ public class SimpleSelectionStrategy implements SelectionStrategy {
 
         if (strategy == AcknowledgementStrategy.STATUS) {
             String statusCol = SqlIdentifier.quote(config.getStatusColumn());
-            String sql = "SELECT " + selectList
+            String sql = "SELECT *"
                     + " FROM " + table
                     + " WHERE " + idCol + " IN ("
                     +   "SELECT " + idCol + " FROM " + table
@@ -37,7 +37,7 @@ public class SimpleSelectionStrategy implements SelectionStrategy {
 
         } else if (strategy == AcknowledgementStrategy.TIMESTAMP) {
             String processedAtCol = SqlIdentifier.quote(config.getProcessedAtColumn());
-            String sql = "SELECT " + selectList
+            String sql = "SELECT *"
                     + " FROM " + table
                     + " WHERE " + idCol + " IN ("
                     +   "SELECT " + idCol + " FROM " + table
@@ -50,7 +50,7 @@ public class SimpleSelectionStrategy implements SelectionStrategy {
 
         } else {
             // DELETE strategy: every row present is pending
-            String sql = "SELECT " + selectList
+            String sql = "SELECT *"
                     + " FROM " + table
                     + " WHERE " + idCol + " IN ("
                     +   "SELECT " + idCol + " FROM " + table

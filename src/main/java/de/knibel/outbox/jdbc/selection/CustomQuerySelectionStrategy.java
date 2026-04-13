@@ -12,7 +12,7 @@ import de.knibel.outbox.config.OutboxTableProperties;
 public class CustomQuerySelectionStrategy implements SelectionStrategy {
 
     @Override
-    public SelectionQuery buildClaimQuery(OutboxTableProperties config, String selectList) {
+    public SelectionQuery buildClaimQuery(OutboxTableProperties config) {
         return new SelectionQuery(config.getCustomQuery(), new Object[0]);
     }
 }

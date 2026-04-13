@@ -21,11 +21,6 @@ public class CamelCasePayloadMapper implements PayloadMapper {
     }
 
     @Override
-    public String buildSelectList(OutboxTableProperties config) {
-        return "*";
-    }
-
-    @Override
     public String mapPayload(ResultSet rs, OutboxTableProperties config) throws SQLException {
         try {
             return RowMapperUtil.buildCamelCasePayload(rs, objectMapper, config.getStaticFields());

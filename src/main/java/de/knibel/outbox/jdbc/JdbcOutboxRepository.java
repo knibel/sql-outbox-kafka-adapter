@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.config.RowMappingStrategy;
 import de.knibel.outbox.domain.OutboxRecord;
+import de.knibel.outbox.jdbc.acknowledgement.CustomAcknowledgementHandler;
+import de.knibel.outbox.jdbc.acknowledgement.DeleteAcknowledgementHandler;
+import de.knibel.outbox.jdbc.acknowledgement.StatusAcknowledgementHandler;
+import de.knibel.outbox.jdbc.acknowledgement.TimestampAcknowledgementHandler;
 import de.knibel.outbox.jdbc.rowmapper.CamelCasePayloadMapper;
 import de.knibel.outbox.jdbc.rowmapper.CustomFieldPayloadMapper;
 import de.knibel.outbox.jdbc.rowmapper.PayloadColumnMapper;
@@ -13,6 +17,7 @@ import de.knibel.outbox.jdbc.selection.CustomQuerySelectionStrategy;
 import de.knibel.outbox.jdbc.selection.SelectionQuery;
 import de.knibel.outbox.jdbc.selection.SelectionStrategy;
 import de.knibel.outbox.jdbc.selection.SimpleSelectionStrategy;
+import de.knibel.outbox.repository.AcknowledgementHandler;
 import de.knibel.outbox.repository.OutboxRepository;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,7 +26,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,8 +81,7 @@ public class JdbcOutboxRepository implements OutboxRepository {
         PayloadMapper payloadMapper = resolvePayloadMapper(config);
         SelectionStrategy selectionStrategy = resolveSelectionStrategy(config);
 
-        String selectList = payloadMapper.buildSelectList(config);
-        SelectionQuery query = selectionStrategy.buildClaimQuery(config, selectList);
+        SelectionQuery query = selectionStrategy.buildClaimQuery(config);
 
         return jdbc.query(query.sql(),
                 (rs, rowNum) -> mapRow(rs, config, payloadMapper),
@@ -87,69 +90,10 @@ public class JdbcOutboxRepository implements OutboxRepository {
 
     @Override
     @Transactional
-    public void markDone(OutboxTableProperties config, List<String> ids) {
+    public void acknowledge(OutboxTableProperties config, List<String> ids) {
         if (ids.isEmpty()) return;
-
-        String table     = SqlIdentifier.quote(config.getTableName());
-        String idCol     = SqlIdentifier.quote(config.getIdColumn());
-        String statusCol = SqlIdentifier.quote(config.getStatusColumn());
-
-        String sql = "UPDATE " + table
-                + " SET " + statusCol + " = :doneValue"
-                + " WHERE " + idCol + " IN (:ids)";
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("doneValue", config.getDoneValue())
-                .addValue("ids", ids);
-
-        namedJdbc.update(sql, params);
-    }
-
-    @Override
-    @Transactional
-    public void deleteByIds(OutboxTableProperties config, List<String> ids) {
-        if (ids.isEmpty()) return;
-
-        String table = SqlIdentifier.quote(config.getTableName());
-        String idCol = SqlIdentifier.quote(config.getIdColumn());
-
-        String sql = "DELETE FROM " + table
-                + " WHERE " + idCol + " IN (:ids)";
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("ids", ids);
-
-        namedJdbc.update(sql, params);
-    }
-
-    @Override
-    @Transactional
-    public void markProcessedAt(OutboxTableProperties config, List<String> ids) {
-        if (ids.isEmpty()) return;
-
-        String table          = SqlIdentifier.quote(config.getTableName());
-        String idCol          = SqlIdentifier.quote(config.getIdColumn());
-        String processedAtCol = SqlIdentifier.quote(config.getProcessedAtColumn());
-
-        String sql = "UPDATE " + table
-                + " SET " + processedAtCol + " = CURRENT_TIMESTAMP"
-                + " WHERE " + idCol + " IN (:ids)";
-
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("ids", ids);
-
-        namedJdbc.update(sql, params);
-    }
-
-    @Override
-    @Transactional
-    public void executeCustomAcknowledgement(OutboxTableProperties config, List<String> ids) {
-        if (ids.isEmpty()) return;
-
-        String sql = config.getCustomAcknowledgementQuery();
-        for (String id : ids) {
-            jdbc.update(sql, id);
-        }
+        AcknowledgementHandler handler = resolveAcknowledgementHandler(config);
+        handler.acknowledge(config, ids);
     }
 
     // ── Strategy resolution ──────────────────────────────────────────────────
@@ -166,6 +110,15 @@ public class JdbcOutboxRepository implements OutboxRepository {
             case TO_CAMEL_CASE -> new CamelCasePayloadMapper(objectMapper);
             case CUSTOM        -> new CustomFieldPayloadMapper(objectMapper);
             default            -> new PayloadColumnMapper();
+        };
+    }
+
+    private AcknowledgementHandler resolveAcknowledgementHandler(OutboxTableProperties config) {
+        return switch (config.getAcknowledgementStrategy()) {
+            case DELETE    -> new DeleteAcknowledgementHandler(namedJdbc);
+            case TIMESTAMP -> new TimestampAcknowledgementHandler(namedJdbc);
+            case CUSTOM    -> new CustomAcknowledgementHandler(jdbc);
+            default        -> new StatusAcknowledgementHandler(namedJdbc);
         };
     }
 

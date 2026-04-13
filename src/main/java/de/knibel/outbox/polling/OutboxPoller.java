@@ -1,6 +1,5 @@
 package de.knibel.outbox.polling;
 
-import de.knibel.outbox.config.AcknowledgementStrategy;
 import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.domain.OutboxRecord;
 import de.knibel.outbox.repository.OutboxRepository;
@@ -84,24 +83,8 @@ public class OutboxPoller {
 
         List<String> ids = records.stream().map(OutboxRecord::id).toList();
         messageSender.sendBatch(records);
-        switch (config.getAcknowledgementStrategy()) {
-            case DELETE -> {
-                repository.deleteByIds(config, ids);
-                log.debug("Deleted {} row(s) from table '{}'", ids.size(), config.getTableName());
-            }
-            case TIMESTAMP -> {
-                repository.markProcessedAt(config, ids);
-                log.debug("Timestamped {} row(s) in table '{}'", ids.size(), config.getTableName());
-            }
-            case CUSTOM -> {
-                repository.executeCustomAcknowledgement(config, ids);
-                log.debug("Custom-acknowledged {} row(s) in table '{}'", ids.size(), config.getTableName());
-            }
-            default -> {
-                repository.markDone(config, ids);
-                log.debug("Marked {} row(s) DONE in table '{}'", ids.size(), config.getTableName());
-            }
-        }
+        repository.acknowledge(config, ids);
+        log.debug("Acknowledged {} row(s) in table '{}'", ids.size(), config.getTableName());
         processedCounter.increment(ids.size());
         return ids.size();
     }

@@ -23,22 +23,12 @@ public interface OutboxRepository {
     List<OutboxRecord> claimBatch(OutboxTableProperties config);
 
     /**
-     * Marks rows as done (STATUS acknowledgement strategy).
+     * Acknowledges that the given rows have been successfully published,
+     * delegating to the appropriate {@link AcknowledgementHandler} based
+     * on the configured {@link de.knibel.outbox.config.AcknowledgementStrategy}.
+     *
+     * @param config table-specific configuration
+     * @param ids    primary-key values of the rows to acknowledge
      */
-    void markDone(OutboxTableProperties config, List<String> ids);
-
-    /**
-     * Deletes rows (DELETE acknowledgement strategy).
-     */
-    void deleteByIds(OutboxTableProperties config, List<String> ids);
-
-    /**
-     * Records the current timestamp (TIMESTAMP acknowledgement strategy).
-     */
-    void markProcessedAt(OutboxTableProperties config, List<String> ids);
-
-    /**
-     * Executes user-provided acknowledgement SQL (CUSTOM acknowledgement strategy).
-     */
-    void executeCustomAcknowledgement(OutboxTableProperties config, List<String> ids);
+    void acknowledge(OutboxTableProperties config, List<String> ids);
 }
