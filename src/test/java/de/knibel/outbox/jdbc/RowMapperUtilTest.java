@@ -1,19 +1,26 @@
 package de.knibel.outbox.jdbc;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.FieldDataType;
+import de.knibel.outbox.config.FieldMapping;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class RowMapperUtilTest {
 
@@ -376,5 +383,142 @@ class RowMapperUtilTest {
         assertThat(meta)
                 .containsEntry("source", "adapter")
                 .containsEntry("version", "1.0");
+    }
+
+    // ── buildCustomPayload with columnPatterns ───────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_patternMapsColumnsToNestedPaths() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("neu_preis");
+        when(meta.getColumnLabel(2)).thenReturn("neu_menge");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn(10.0);
+        when(rs.getObject(2)).thenReturn(5);
+
+        FieldMapping patternMapping = new FieldMapping();
+        patternMapping.setName("neu.$1");
+
+        Map<Pattern, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put(Pattern.compile("neu_(.*)"), patternMapping);
+
+        String json = RowMapperUtil.buildCustomPayload(rs, Map.of(), patterns, new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        Map<String, Object> neu = (Map<String, Object>) payload.get("neu");
+        assertThat(neu).isNotNull();
+        assertThat(neu.get("preis")).isEqualTo(10.0);
+        assertThat(neu.get("menge")).isEqualTo(5);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_multiplePatterns_firstMatchWins() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("neu_x");
+        when(meta.getColumnLabel(2)).thenReturn("alt_x");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn("new_value");
+        when(rs.getObject(2)).thenReturn("old_value");
+
+        FieldMapping neuMapping = new FieldMapping();
+        neuMapping.setName("neu.$1");
+        FieldMapping altMapping = new FieldMapping();
+        altMapping.setName("alt.$1");
+
+        Map<Pattern, FieldMapping> patterns = new LinkedHashMap<>();
+        patterns.put(Pattern.compile("neu_(.*)"), neuMapping);
+        patterns.put(Pattern.compile("alt_(.*)"), altMapping);
+
+        String json = RowMapperUtil.buildCustomPayload(rs, Map.of(), patterns, new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        Map<String, Object> neu = (Map<String, Object>) payload.get("neu");
+        assertThat(neu).isNotNull().containsEntry("x", "new_value");
+
+        Map<String, Object> alt = (Map<String, Object>) payload.get("alt");
+        assertThat(alt).isNotNull().containsEntry("x", "old_value");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_explicitMappingTakesPrecedenceOverPattern() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(1);
+        when(meta.getColumnLabel(1)).thenReturn("neu_preis");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject("neu_preis")).thenReturn("explicit_value");
+        when(rs.getObject(1)).thenReturn("pattern_value");
+
+        FieldMapping explicitMapping = new FieldMapping();
+        explicitMapping.setName("overridden.preis");
+
+        FieldMapping patternMapping = new FieldMapping();
+        patternMapping.setName("neu.$1");
+
+        String json = RowMapperUtil.buildCustomPayload(
+                rs,
+                Map.of("neu_preis", explicitMapping),
+                Map.of(Pattern.compile("neu_(.*)"), patternMapping),
+                new ObjectMapper(),
+                Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        // Explicit mapping wins; the pattern-based path must NOT be present
+        Map<String, Object> overridden = (Map<String, Object>) payload.get("overridden");
+        assertThat(overridden).isNotNull().containsEntry("preis", "explicit_value");
+        assertThat(payload).doesNotContainKey("neu");
+    }
+
+    @Test
+    void buildCustomPayload_nonMatchingColumnsAreIgnored() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(2);
+        when(meta.getColumnLabel(1)).thenReturn("id");
+        when(meta.getColumnLabel(2)).thenReturn("status");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn("123");
+        when(rs.getObject(2)).thenReturn("PENDING");
+
+        FieldMapping patternMapping = new FieldMapping();
+        patternMapping.setName("neu.$1");
+
+        String json = RowMapperUtil.buildCustomPayload(rs, Map.of(),
+                Map.of(Pattern.compile("neu_(.*)"), patternMapping), new ObjectMapper(), Map.of());
+
+        assertThat(json).isEqualTo("{}");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCustomPayload_patternWithCaptureGroups_multiGroup() throws Exception {
+        ResultSetMetaData meta = mock(ResultSetMetaData.class);
+        when(meta.getColumnCount()).thenReturn(1);
+        when(meta.getColumnLabel(1)).thenReturn("neu_adresse_stadt");
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getMetaData()).thenReturn(meta);
+        when(rs.getObject(1)).thenReturn("Berlin");
+
+        FieldMapping patternMapping = new FieldMapping();
+        patternMapping.setName("neu.$1");
+
+        String json = RowMapperUtil.buildCustomPayload(rs, Map.of(),
+                Map.of(Pattern.compile("neu_(.*)"), patternMapping), new ObjectMapper(), Map.of());
+        Map<String, Object> payload = new ObjectMapper().readValue(json, Map.class);
+
+        Map<String, Object> neu = (Map<String, Object>) payload.get("neu");
+        assertThat(neu).isNotNull().containsEntry("adresse_stadt", "Berlin");
     }
 }

@@ -1,7 +1,9 @@
 package de.knibel.outbox.config;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Configuration for a single outbox table.
@@ -142,6 +144,37 @@ public class OutboxTableProperties {
      * Produces: {@code {"orderId":"…","totalAmount":99.95,"customer":{"name":"…"}}}
      */
     private Map<String, FieldMapping> fieldMappings = new LinkedHashMap<>();
+
+    /**
+     * Regex-pattern-to-JSON-field mappings, used only when
+     * {@code rowMappingStrategy} is {@link RowMappingStrategy#CUSTOM}.
+     *
+     * <p>Keys are Java regular-expression patterns applied against every
+     * column label in the result set using full-string matching
+     * (equivalent to {@link java.util.regex.Matcher#matches()}).
+     * Values are {@link FieldMapping} objects whose {@code name} may contain
+     * back-references ({@code $1}, {@code $2}, …) that are resolved against
+     * the capturing groups of the matched column name.
+     *
+     * <p>Columns already listed in {@code fieldMappings} are excluded from
+     * pattern matching so that explicit mappings always take precedence.
+     *
+     * <p>Example:
+     * <pre>
+     *   columnPatterns:
+     *     "neu_(.*)":
+     *       name: "neu.$1"
+     *     "alt_(.*)":
+     *       name: "alt.$1"
+     * </pre>
+     * A row containing the columns {@code neu_preis=10.0} and
+     * {@code alt_preis=8.0} produces:
+     * {@code {"neu":{"preis":10.0},"alt":{"preis":8.0}}}
+     */
+    private Map<String, FieldMapping> columnPatterns = new LinkedHashMap<>();
+
+    /** Lazily compiled version of {@link #columnPatterns}; invalidated when the map is replaced. */
+    private transient volatile Map<Pattern, FieldMapping> compiledColumnPatterns;
 
     /**
      * Static key-value pairs injected into every JSON payload.
@@ -303,6 +336,29 @@ public class OutboxTableProperties {
 
     public Map<String, FieldMapping> getFieldMappings() { return fieldMappings; }
     public void setFieldMappings(Map<String, FieldMapping> fieldMappings) { this.fieldMappings = fieldMappings; }
+
+    public Map<String, FieldMapping> getColumnPatterns() { return columnPatterns; }
+    public void setColumnPatterns(Map<String, FieldMapping> columnPatterns) {
+        this.columnPatterns = columnPatterns;
+        this.compiledColumnPatterns = null; // invalidate cache
+    }
+
+    /**
+     * Returns the {@link #columnPatterns} compiled as {@link Pattern} objects,
+     * keyed by their compiled form.  Patterns are compiled lazily on the first
+     * call and cached for reuse across poll cycles.
+     */
+    public Map<Pattern, FieldMapping> getCompiledColumnPatterns() {
+        Map<Pattern, FieldMapping> cached = compiledColumnPatterns;
+        if (cached == null) {
+            Map<Pattern, FieldMapping> compiled = new LinkedHashMap<>();
+            for (Map.Entry<String, FieldMapping> entry : columnPatterns.entrySet()) {
+                compiled.put(Pattern.compile(entry.getKey()), entry.getValue());
+            }
+            compiledColumnPatterns = cached = Collections.unmodifiableMap(compiled);
+        }
+        return cached;
+    }
 
     public String getProcessedAtColumn() { return processedAtColumn; }
     public void setProcessedAtColumn(String processedAtColumn) { this.processedAtColumn = processedAtColumn; }
