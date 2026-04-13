@@ -1,0 +1,112 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# sql-outbox-kafka-adapter – Example: column-to-list mapping
+#
+# This configuration demonstrates the `listMappings` feature:
+# paired columns (e.g. new_*/old_*) are collected into a JSON array
+# where each unique column-name suffix produces one array element.
+#
+# Use case: a product audit trail table records changes to multiple
+# attributes per row.  Each change is stored as a pair of columns
+# (new_<field>, old_<field>).  The adapter publishes them as a list
+# of modifications in the JSON payload.
+#
+# Table DDL (PostgreSQL):
+#
+#   CREATE TABLE product_audit (
+#       audit_id        VARCHAR(36)   PRIMARY KEY,
+#       audit_ts        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+#       action          CHAR(1)       NOT NULL DEFAULT 'U',
+#       product_key     VARCHAR(100)  NOT NULL,
+#       new_price       NUMERIC(10,2),
+#       old_price       NUMERIC(10,2),
+#       new_stock       INTEGER,
+#       old_stock       INTEGER,
+#       new_label       VARCHAR(200),
+#       old_label       VARCHAR(200),
+#       status          VARCHAR(20)   NOT NULL DEFAULT 'PENDING'
+#   );
+#
+# Example row:
+#   audit_id='abc', audit_ts=2024-03-15T10:30:00, action='U',
+#   product_key='SKU-42', new_price=29.99, old_price=24.99,
+#   new_stock=150, old_stock=100, new_label='Widget Pro', old_label='Widget'
+#
+# Resulting Kafka message value:
+#   {
+#     "timestamp": "2024-03-15T10:30:00",
+#     "action": "UPDATE",
+#     "productKey": "SKU-42",
+#     "modifications": [
+#       {"attribute": "price", "after": 29.99, "before": 24.99},
+#       {"attribute": "stock", "after": 150,   "before": 100},
+#       {"attribute": "label", "after": "Widget Pro", "before": "Widget"}
+#     ]
+#   }
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  application:
+    name: product-audit-outbox-adapter
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydb
+    username: myuser
+    password: mypassword
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+
+outbox:
+
+  kafka:
+    bootstrap-servers: kafka-broker:9092
+
+  tables:
+    - tableName: product_audit
+
+      idColumn: audit_id
+      keyColumn: product_key
+
+      staticTopic: product-audit
+
+      pollIntervalMs: 500
+      batchSize: 100
+
+      acknowledgementStrategy: STATUS
+      statusColumn: status
+      pendingValue: PENDING
+      doneValue: DONE
+
+      rowMappingStrategy: CUSTOM
+
+      # ── Fixed columns → flat or nested JSON fields ───────────────────
+      fieldMappings:
+        audit_ts:
+          name: timestamp
+          dataType: DATETIME
+          format: "yyyy-MM-dd'T'HH:mm:ss"
+        action:
+          name: action
+          valueMappings:
+            "I": INSERT
+            "U": UPDATE
+            "D": DELETE
+        product_key:
+          name: productKey
+
+      # ── Paired columns → JSON array ─────────────────────────────────
+      # Every column matching "new_(.*)" or "old_(.*)" is grouped by
+      # the captured suffix.  Each unique suffix becomes one element in
+      # the "modifications" array.  The suffix is stored as "attribute".
+      listMappings:
+        modifications:
+          keyProperty: attribute
+          patterns:
+            "new_(.*)":
+              name: after
+            "old_(.*)":
+              name: before
+
+logging:
+  level:
+    org.apache.kafka.clients: WARN
