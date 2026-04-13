@@ -32,6 +32,7 @@ jobs:
         id: maven-version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          VERSION=${VERSION%-SNAPSHOT}
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Extract Docker metadata
