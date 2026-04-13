@@ -25,7 +25,7 @@ public class CustomFieldPayloadMapper implements PayloadMapper {
         try {
             return RowMapperUtil.buildCustomPayload(
                     rs, config.getFieldMappings(), config.getCompiledColumnPatterns(),
-                    objectMapper, config.getStaticFields());
+                    config.getListMappings(), objectMapper, config.getStaticFields());
         } catch (Exception e) {
             throw new SQLException("Failed to build custom payload", e);
         }

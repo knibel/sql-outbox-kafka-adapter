@@ -91,3 +91,20 @@ CREATE TABLE IF NOT EXISTS batch_status (
     fetched_flag    INTEGER       NOT NULL DEFAULT 0,
     fetched_at      TIMESTAMP
 );
+
+-- Table for column-to-list mapping integration test
+-- Simulates a product audit trail where each row tracks changes to
+-- multiple attributes via paired new_*/old_* columns.
+CREATE TABLE IF NOT EXISTS product_audit (
+    audit_id        VARCHAR(36)   PRIMARY KEY,
+    audit_ts        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    action          CHAR(1)       NOT NULL DEFAULT 'U',
+    product_key     VARCHAR(100)  NOT NULL,
+    new_price       NUMERIC(10,2),
+    old_price       NUMERIC(10,2),
+    new_stock       INTEGER,
+    old_stock       INTEGER,
+    new_label       VARCHAR(200),
+    old_label       VARCHAR(200),
+    status          VARCHAR(20)   NOT NULL DEFAULT 'PENDING'
+);

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.FieldMapping;
+import de.knibel.outbox.config.ListMapping;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -13,8 +14,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -206,13 +209,51 @@ public final class RowMapperUtil {
                                             ObjectMapper objectMapper,
                                             Map<String, String> staticFields)
             throws SQLException, JsonProcessingException {
+        return buildCustomPayload(rs, fieldMappings, columnPatterns, Map.of(), objectMapper, staticFields);
+    }
+
+    /**
+     * Reads columns from the current result-set row using explicit
+     * {@code fieldMappings}, regex-based {@code columnPatterns}, and
+     * list-building {@code listMappings}, builds a (possibly nested)
+     * JSON object, and then applies any {@code staticFields}.
+     *
+     * <p>Processing order and precedence:
+     * <ol>
+     *   <li><b>fieldMappings</b> – explicit column-to-path mappings.
+     *       Columns handled here are excluded from all pattern matching.
+     *   <li><b>columnPatterns</b> – regex-based column-to-path mappings.
+     *       Columns matched here are excluded from list mapping.
+     *   <li><b>listMappings</b> – groups remaining columns by first
+     *       capturing group into JSON arrays at the specified target paths.
+     *   <li><b>staticFields</b> – constant values injected last, can
+     *       override any column-derived value.
+     * </ol>
+     *
+     * @param rs              positioned result-set row
+     * @param fieldMappings   explicit source-column → {@link FieldMapping} mapping
+     * @param columnPatterns  pre-compiled regex-pattern → {@link FieldMapping} template mapping
+     * @param listMappings    target-path → {@link ListMapping} for array construction
+     * @param objectMapper    Jackson mapper for serialization
+     * @param staticFields    constant key-value pairs to inject (may be empty)
+     * @return JSON string representing the mapped payload
+     */
+    public static String buildCustomPayload(ResultSet rs,
+                                            Map<String, FieldMapping> fieldMappings,
+                                            Map<Pattern, FieldMapping> columnPatterns,
+                                            Map<String, ListMapping> listMappings,
+                                            ObjectMapper objectMapper,
+                                            Map<String, String> staticFields)
+            throws SQLException, JsonProcessingException {
         Map<String, Object> root = new LinkedHashMap<>();
 
+        // Track all handled columns to enforce precedence across strategies
+        Set<String> handledColumns = new HashSet<>();
+
         // Step 1: Apply explicit field mappings
-        Set<String> explicitColumns = new HashSet<>();
         for (Map.Entry<String, FieldMapping> entry : fieldMappings.entrySet()) {
             String sourceColumn = entry.getKey();
-            explicitColumns.add(sourceColumn.toLowerCase(Locale.ROOT));
+            handledColumns.add(sourceColumn.toLowerCase(Locale.ROOT));
             FieldMapping mapping = entry.getValue();
             Object value = rs.getObject(sourceColumn);
             Object mapped = applyValueMapping(value, mapping.getValueMappings());
@@ -220,13 +261,21 @@ public final class RowMapperUtil {
             setNestedValue(root, mapping.getName(), converted);
         }
 
+        // Lazily read metadata only when pattern-based or list-based mappings exist
+        ResultSetMetaData meta = null;
+        int columnCount = 0;
+        boolean needMeta = (columnPatterns != null && !columnPatterns.isEmpty())
+                || (listMappings != null && !listMappings.isEmpty());
+        if (needMeta) {
+            meta = rs.getMetaData();
+            columnCount = meta.getColumnCount();
+        }
+
         // Step 2: Apply pattern-based mappings to columns not already explicitly mapped
         if (columnPatterns != null && !columnPatterns.isEmpty()) {
-            ResultSetMetaData meta = rs.getMetaData();
-            int columnCount = meta.getColumnCount();
             for (int i = 1; i <= columnCount; i++) {
                 String columnName = meta.getColumnLabel(i);
-                if (explicitColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
+                if (handledColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                     continue;
                 }
                 for (Map.Entry<Pattern, FieldMapping> compiledEntry : columnPatterns.entrySet()) {
@@ -238,8 +287,55 @@ public final class RowMapperUtil {
                         Object mapped = applyValueMapping(value, template.getValueMappings());
                         Object converted = convertValue(mapped, template.getDataType(), template.getFormat());
                         setNestedValue(root, targetName, converted);
+                        handledColumns.add(columnName.toLowerCase(Locale.ROOT));
                         break; // first matching pattern wins
                     }
+                }
+            }
+        }
+
+        // Step 3: Apply list mappings to columns not handled above
+        if (listMappings != null && !listMappings.isEmpty()) {
+            for (Map.Entry<String, ListMapping> listEntry : listMappings.entrySet()) {
+                String targetPath = listEntry.getKey();
+                ListMapping listMapping = listEntry.getValue();
+                Map<Pattern, FieldMapping> compiledPatterns = listMapping.getCompiledPatterns();
+
+                // Group by first capturing group: capturedKey → {propertyName → value}
+                Map<String, Map<String, Object>> groups = new LinkedHashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = meta.getColumnLabel(i);
+                    if (handledColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
+                        continue;
+                    }
+                    for (Map.Entry<Pattern, FieldMapping> patEntry : compiledPatterns.entrySet()) {
+                        Matcher matcher = patEntry.getKey().matcher(columnName);
+                        if (matcher.matches() && matcher.groupCount() >= 1) {
+                            String capturedKey = matcher.group(1);
+                            FieldMapping template = patEntry.getValue();
+                            Object value = rs.getObject(i);
+                            Object mapped = applyValueMapping(value, template.getValueMappings());
+                            Object converted = convertValue(mapped, template.getDataType(), template.getFormat());
+                            groups.computeIfAbsent(capturedKey, _ -> new LinkedHashMap<>())
+                                  .put(template.getName(), converted);
+                            handledColumns.add(columnName.toLowerCase(Locale.ROOT));
+                            break; // first matching pattern wins for this column
+                        }
+                    }
+                }
+
+                // Convert grouped entries to a JSON array
+                List<Map<String, Object>> list = new ArrayList<>();
+                for (Map.Entry<String, Map<String, Object>> groupEntry : groups.entrySet()) {
+                    Map<String, Object> element = new LinkedHashMap<>();
+                    if (listMapping.getKeyProperty() != null && !listMapping.getKeyProperty().isBlank()) {
+                        element.put(listMapping.getKeyProperty(), groupEntry.getKey());
+                    }
+                    element.putAll(groupEntry.getValue());
+                    list.add(element);
+                }
+                if (!list.isEmpty()) {
+                    setNestedValue(root, targetPath, list);
                 }
             }
         }
