@@ -85,20 +85,21 @@ Controls how SQL row columns are mapped to the Kafka record value (payload).
 |---|---|
 | `PAYLOAD_COLUMN` _(default)_ | Reads a pre-serialized JSON string from `payloadColumn`. |
 | `TO_CAMEL_CASE` | Selects all columns and converts each `snake_case` column name to `camelCase` in the resulting JSON payload. No `payloadColumn` needed. |
-| `CUSTOM` | Uses the explicit `fieldMappings` to map source columns to target JSON fields. Supports nested objects via dot-separated paths, data type conversion, date/datetime formatting, and value mapping. |
+| `CUSTOM` | Uses the explicit `fieldMappings` and/or regex-based `columnPatterns` to map source columns to target JSON fields. Supports nested objects via dot-separated paths, data type conversion, date/datetime formatting, and value mapping. |
 
 | Property | Default | Description |
 |---|---|---|
 | `rowMappingStrategy` | `PAYLOAD_COLUMN` | One of `PAYLOAD_COLUMN`, `TO_CAMEL_CASE`, `CUSTOM`. |
-| `fieldMappings` | _(empty)_ | Required when `rowMappingStrategy` is `CUSTOM`. A map of source SQL column names to field mapping objects. |
+| `fieldMappings` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of source SQL column names to field mapping objects. At least one of `fieldMappings` or `columnPatterns` must be non-empty. |
+| `columnPatterns` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of Java regex patterns to field mapping objects. Each pattern is matched against the full column label; the `name` may contain back-references (`$1`, `$2`, …). Explicit `fieldMappings` take precedence over patterns. At least one of `fieldMappings` or `columnPatterns` must be non-empty. |
 
-##### Field mapping properties (`fieldMappings.<column>`)
+##### Field mapping properties (`fieldMappings.<column>` and `columnPatterns.<pattern>`)
 
-Each entry in `fieldMappings` maps a source SQL column to a target JSON field:
+Entries in both `fieldMappings` and `columnPatterns` share the same mapping properties:
 
 | Property | Required | Description |
 |---|---|---|
-| `name` | **yes** | Target JSON field path. Dot-separated paths produce nested objects (e.g. `customer.address.city`). |
+| `name` | **yes** | Target JSON field path. Dot-separated paths produce nested objects (e.g. `customer.address.city`). In `columnPatterns`, back-references (`$1`, `$2`, …) may be used to incorporate captured groups from the pattern. |
 | `dataType` | no | Target data type for conversion. One of: `STRING`, `INTEGER`, `LONG`, `DOUBLE`, `BOOLEAN`, `DECIMAL`, `DATE`, `DATETIME`. When omitted, the JDBC driver's default Java mapping is used. |
 | `format` | when `dataType` is `DATE` or `DATETIME` | A `DateTimeFormatter` pattern (e.g. `yyyy-MM-dd`, `yyyy-MM-dd'T'HH:mm:ss`). Accepts `java.sql.Date`, `java.sql.Timestamp`, `LocalDate`, `LocalDateTime`, `Instant`, and `java.util.Date`. |
 | `valueMappings` | no | A map of raw database values (as strings) to replacement output values. Applied _before_ `dataType` conversion. Useful for translating integer codes to enum strings (e.g. `"1": ACTIVE`). Unmapped values pass through unchanged. |
@@ -433,3 +434,49 @@ A row with `status_code=1` and `priority=2` produces:
 ```
 
 Values not present in the mapping pass through unchanged.
+
+### CUSTOM row mapping with column patterns (generic prefix mapping)
+
+Use `columnPatterns` to map groups of columns generically using Java regular
+expressions.  The `name` may contain back-references (`$1`, `$2`, …) that are
+resolved against the capturing groups of the matched column name.  This avoids
+having to list every column individually in `fieldMappings`.
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      rowMappingStrategy: CUSTOM
+      columnPatterns:
+        "neu_(.*)":
+          name: "neu.$1"
+        "alt_(.*)":
+          name: "alt.$1"
+```
+
+A row with columns `neu_preis=10.0`, `neu_menge=2`, `alt_preis=8.0`, and
+`alt_menge=3` produces:
+
+```json
+{
+  "neu": { "preis": 10.0, "menge": 2 },
+  "alt": { "preis": 8.0,  "menge": 3 }
+}
+```
+
+You can combine `columnPatterns` with explicit `fieldMappings`.  Explicit
+mappings always take precedence: a column already covered by `fieldMappings`
+is skipped when evaluating patterns.
+
+```yaml
+columnPatterns:
+  "neu_(.*)":
+    name: "neu.$1"
+fieldMappings:
+  neu_preis:
+    name: specialPrice   # explicit mapping wins for this column
+    dataType: DOUBLE
+```

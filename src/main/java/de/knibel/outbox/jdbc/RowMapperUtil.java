@@ -13,8 +13,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Utility methods for mapping SQL result-set rows to JSON payloads.
@@ -166,15 +171,80 @@ public final class RowMapperUtil {
                                             ObjectMapper objectMapper,
                                             Map<String, String> staticFields)
             throws SQLException, JsonProcessingException {
+        return buildCustomPayload(rs, fieldMappings, Map.of(), objectMapper, staticFields);
+    }
+
+    /**
+     * Reads columns from the current result-set row using both explicit
+     * {@code fieldMappings} and regex-based {@code columnPatterns}, builds a
+     * (possibly nested) JSON object, and then applies any {@code staticFields}.
+     *
+     * <p>Explicit {@code fieldMappings} are processed first and always take
+     * precedence: a column already covered by an explicit mapping is skipped
+     * when evaluating {@code columnPatterns}.
+     *
+     * <p>Each key in {@code columnPatterns} is a Java regular-expression
+     * pattern matched against the full column label
+     * (via {@link Matcher#matches()}).  The {@code name} in the corresponding
+     * {@link FieldMapping} may contain back-references ({@code $1}, {@code $2},
+     * …) that are resolved against the capturing groups of the matched column
+     * name.
+     *
+     * <p>Example: pattern {@code "neu_(.*)"} with name {@code "neu.$1"}
+     * maps column {@code neu_preis} to JSON path {@code neu.preis}.
+     *
+     * @param rs             positioned result-set row
+     * @param fieldMappings  explicit source-column → {@link FieldMapping} mapping
+     * @param columnPatterns regex-pattern → {@link FieldMapping} template mapping
+     * @param objectMapper   Jackson mapper for serialization
+     * @param staticFields   constant key-value pairs to inject (may be empty)
+     * @return JSON string representing the mapped payload
+     */
+    public static String buildCustomPayload(ResultSet rs,
+                                            Map<String, FieldMapping> fieldMappings,
+                                            Map<String, FieldMapping> columnPatterns,
+                                            ObjectMapper objectMapper,
+                                            Map<String, String> staticFields)
+            throws SQLException, JsonProcessingException {
         Map<String, Object> root = new LinkedHashMap<>();
+
+        // Step 1: Apply explicit field mappings
+        Set<String> explicitColumns = new HashSet<>();
         for (Map.Entry<String, FieldMapping> entry : fieldMappings.entrySet()) {
             String sourceColumn = entry.getKey();
+            explicitColumns.add(sourceColumn.toLowerCase(Locale.ROOT));
             FieldMapping mapping = entry.getValue();
             Object value = rs.getObject(sourceColumn);
             Object mapped = applyValueMapping(value, mapping.getValueMappings());
             Object converted = convertValue(mapped, mapping.getDataType(), mapping.getFormat());
             setNestedValue(root, mapping.getName(), converted);
         }
+
+        // Step 2: Apply pattern-based mappings to columns not already explicitly mapped
+        if (columnPatterns != null && !columnPatterns.isEmpty()) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int columnCount = meta.getColumnCount();
+            for (int i = 1; i <= columnCount; i++) {
+                String columnName = meta.getColumnLabel(i);
+                if (explicitColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
+                    continue;
+                }
+                for (Map.Entry<String, FieldMapping> patternEntry : columnPatterns.entrySet()) {
+                    Pattern pattern = Pattern.compile(patternEntry.getKey());
+                    Matcher matcher = pattern.matcher(columnName);
+                    if (matcher.matches()) {
+                        FieldMapping template = patternEntry.getValue();
+                        String targetName = pattern.matcher(columnName).replaceAll(template.getName());
+                        Object value = rs.getObject(i);
+                        Object mapped = applyValueMapping(value, template.getValueMappings());
+                        Object converted = convertValue(mapped, template.getDataType(), template.getFormat());
+                        setNestedValue(root, targetName, converted);
+                        break; // first matching pattern wins
+                    }
+                }
+            }
+        }
+
         applyStaticFields(root, staticFields);
         return objectMapper.writeValueAsString(root);
     }

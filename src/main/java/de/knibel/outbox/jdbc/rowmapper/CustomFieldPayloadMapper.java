@@ -7,9 +7,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /**
- * Uses the explicit {@code fieldMappings} configuration to map source columns
- * to target JSON paths.  Supports nested objects via dot-separated paths,
- * data type conversion, date/datetime formatting, and value mapping.
+ * Uses the explicit {@code fieldMappings} and optional regex-based
+ * {@code columnPatterns} to map source columns to target JSON paths.
+ * Supports nested objects via dot-separated paths, data type conversion,
+ * date/datetime formatting, and value mapping.
  */
 public class CustomFieldPayloadMapper implements PayloadMapper {
 
@@ -23,7 +24,8 @@ public class CustomFieldPayloadMapper implements PayloadMapper {
     public String mapPayload(ResultSet rs, OutboxTableProperties config) throws SQLException {
         try {
             return RowMapperUtil.buildCustomPayload(
-                    rs, config.getFieldMappings(), objectMapper, config.getStaticFields());
+                    rs, config.getFieldMappings(), config.getColumnPatterns(),
+                    objectMapper, config.getStaticFields());
         } catch (Exception e) {
             throw new SQLException("Failed to build custom payload", e);
         }

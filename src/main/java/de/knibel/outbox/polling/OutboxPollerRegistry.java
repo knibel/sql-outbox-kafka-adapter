@@ -13,6 +13,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -258,31 +260,67 @@ public class OutboxPollerRegistry implements SmartLifecycle {
                 SqlIdentifier.quote(cfg.getPayloadColumn());
             }
 
-            // Validate CUSTOM strategy: fieldMappings must not be empty and
-            // all source column names must be safe SQL identifiers
+            // Validate CUSTOM strategy: at least one of fieldMappings or columnPatterns must be
+            // non-empty; all explicit column names must be safe SQL identifiers; all FieldMapping
+            // entries must have a non-blank name; DATE/DATETIME entries must have a format;
+            // all columnPatterns keys must be valid Java regex patterns.
             if (rowMapping == RowMappingStrategy.CUSTOM) {
-                if (cfg.getFieldMappings() == null || cfg.getFieldMappings().isEmpty()) {
+                boolean hasFieldMappings = cfg.getFieldMappings() != null && !cfg.getFieldMappings().isEmpty();
+                boolean hasColumnPatterns = cfg.getColumnPatterns() != null && !cfg.getColumnPatterns().isEmpty();
+                if (!hasFieldMappings && !hasColumnPatterns) {
                     throw new IllegalArgumentException(
-                            "Table '" + name + "': rowMappingStrategy=CUSTOM requires non-empty 'fieldMappings'");
+                            "Table '" + name + "': rowMappingStrategy=CUSTOM requires non-empty "
+                            + "'fieldMappings' or 'columnPatterns'");
                 }
-                for (var entry : cfg.getFieldMappings().entrySet()) {
-                    if (!hasCustomQuery) {
-                        SqlIdentifier.quote(entry.getKey());
+                if (hasFieldMappings) {
+                    for (var entry : cfg.getFieldMappings().entrySet()) {
+                        if (!hasCustomQuery) {
+                            SqlIdentifier.quote(entry.getKey());
+                        }
+                        FieldMapping mapping = entry.getValue();
+                        if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': fieldMappings entry for column '"
+                                    + entry.getKey() + "' must have a non-blank 'name'");
+                        }
+                        FieldDataType dt = mapping.getDataType();
+                        if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
+                                && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': fieldMappings entry for column '"
+                                    + entry.getKey() + "' with dataType=" + dt
+                                    + " requires a non-blank 'format' pattern");
+                        }
                     }
-                    FieldMapping mapping = entry.getValue();
-                    if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
-                        throw new IllegalArgumentException(
-                                "Table '" + name + "': fieldMappings entry for column '"
-                                + entry.getKey() + "' must have a non-blank 'name'");
-                    }
-                    // DATE and DATETIME require a format pattern
-                    FieldDataType dt = mapping.getDataType();
-                    if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
-                            && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
-                        throw new IllegalArgumentException(
-                                "Table '" + name + "': fieldMappings entry for column '"
-                                + entry.getKey() + "' with dataType=" + dt
-                                + " requires a non-blank 'format' pattern");
+                }
+                if (hasColumnPatterns) {
+                    for (var entry : cfg.getColumnPatterns().entrySet()) {
+                        String patternKey = entry.getKey();
+                        if (patternKey == null || patternKey.isBlank()) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': columnPatterns key must not be blank");
+                        }
+                        try {
+                            Pattern.compile(patternKey);
+                        } catch (PatternSyntaxException e) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': columnPatterns key '"
+                                    + patternKey + "' is not a valid regular expression: " + e.getMessage(), e);
+                        }
+                        FieldMapping mapping = entry.getValue();
+                        if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': columnPatterns entry for pattern '"
+                                    + patternKey + "' must have a non-blank 'name'");
+                        }
+                        FieldDataType dt = mapping.getDataType();
+                        if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
+                                && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
+                            throw new IllegalArgumentException(
+                                    "Table '" + name + "': columnPatterns entry for pattern '"
+                                    + patternKey + "' with dataType=" + dt
+                                    + " requires a non-blank 'format' pattern");
+                        }
                     }
                 }
             }
