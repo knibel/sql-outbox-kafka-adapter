@@ -65,3 +65,25 @@ CREATE TABLE IF NOT EXISTS static_fields_outbox (
     amount          NUMERIC(10,2),
     status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
 );
+
+-- Tables for RPS_ADR / RPS_ADR_STATUS integration test
+-- (replacing RpsAdrRepository / RpsAdrStatusRepository with the adapter)
+CREATE TABLE IF NOT EXISTS rps_adr (
+    ext_load_id           BIGINT        PRIMARY KEY,
+    bk_stichtag_dat       DATE          NOT NULL,
+    ext_job_id            BIGINT        NOT NULL,
+    bk_adr_nummer         BIGINT        NOT NULL,
+    kunde_ausgefallen_knz BOOLEAN       DEFAULT FALSE,
+    doppelkunde_knz       BOOLEAN       DEFAULT FALSE,
+    umsatz_btr            NUMERIC(15,2),
+    kne_obligo_btr        NUMERIC(15,2),
+    kne_obligo_ts         TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rps_adr_status (
+    dwh_job_id_batch    BIGINT        PRIMARY KEY,
+    stichtag_dat        DATE          NOT NULL,
+    anz_adr             BIGINT,
+    daten_abgeholt_jn   INTEGER       NOT NULL DEFAULT 0,
+    daten_abholung_dat  TIMESTAMP
+);
