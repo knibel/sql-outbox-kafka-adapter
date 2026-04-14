@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# sql-outbox-kafka-adapter – Example: column-to-list mapping
+# sql-outbox-kafka-adapter – Example: column-to-list mapping (group rules)
 #
-# This configuration demonstrates the `listMappings` feature:
+# This configuration demonstrates the `group` mapping feature:
 # paired columns (e.g. new_*/old_*) are collected into a JSON array
 # where each unique column-name suffix produces one array element.
 #
@@ -77,35 +77,39 @@ outbox:
       pendingValue: PENDING
       doneValue: DONE
 
-      rowMappingStrategy: CUSTOM
+      # ── Mapping rules ───────────────────────────────────────────────
+      mappings:
 
-      # ── Fixed columns → flat or nested JSON fields ───────────────────
-      fieldMappings:
-        audit_ts:
-          name: timestamp
+        # Fixed columns → flat or nested JSON fields
+        - source: audit_ts
+          target: timestamp
           dataType: DATETIME
           format: "yyyy-MM-dd'T'HH:mm:ss"
-        action:
-          name: action
+        - source: action
+          target: action
           valueMappings:
             "I": INSERT
             "U": UPDATE
             "D": DELETE
-        product_key:
-          name: productKey
+        - source: product_key
+          target: productKey
 
-      # ── Paired columns → JSON array ─────────────────────────────────
-      # Every column matching "new_(.*)" or "old_(.*)" is grouped by
-      # the captured suffix.  Each unique suffix becomes one element in
-      # the "modifications" array.  The suffix is stored as "attribute".
-      listMappings:
-        modifications:
-          keyProperty: attribute
-          patterns:
-            "new_(.*)":
-              name: after
-            "old_(.*)":
-              name: before
+        # Paired columns → JSON array
+        # Every column matching /new_(.*)/ or /old_(.*)/ is grouped by
+        # the captured suffix.  Each unique suffix becomes one element in
+        # the "modifications" array.  The suffix is stored as "attribute".
+        - source: /new_(.*)/
+          target: modifications
+          group:
+            by: $1
+            keyProperty: attribute
+            property: after
+        - source: /old_(.*)/
+          target: modifications
+          group:
+            by: $1
+            keyProperty: attribute
+            property: before
 
 logging:
   level:

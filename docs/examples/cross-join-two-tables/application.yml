@@ -73,40 +73,38 @@ outbox:
       customAcknowledgementQuery: >
         DELETE FROM DATA_RECORDS WHERE LOAD_ID = ?
 
-      rowMappingStrategy: CUSTOM
-
-      fieldMappings:
-        ENTITY_ID:
-          name: eventData.entityId
+      mappings:
+        - source: ENTITY_ID
+          target: eventData.entityId
           dataType: LONG
-        REFERENCE_DATE:
-          name: eventData.items.referenceDate
+        - source: REFERENCE_DATE
+          target: eventData.items.referenceDate
           dataType: DATE
           format: "yyyy-MM-dd"
-        BATCH_REF_ID:
-          name: eventData.items.batchId
+        - source: BATCH_REF_ID
+          target: eventData.items.batchId
           dataType: LONG
-        DEFAULT_FLAG:
-          name: eventData.items.defaultFlag
+        - source: DEFAULT_FLAG
+          target: eventData.items.defaultFlag
           dataType: BOOLEAN
-        DUPLICATE_FLAG:
-          name: eventData.items.duplicateFlag
+        - source: DUPLICATE_FLAG
+          target: eventData.items.duplicateFlag
           dataType: BOOLEAN
-        AMOUNT:
-          name: eventData.items.amount
+        - source: AMOUNT
+          target: eventData.items.amount
           dataType: DECIMAL
-        LIABILITY_AMOUNT:
-          name: eventData.items.liabilityAmount
+        - source: LIABILITY_AMOUNT
+          target: eventData.items.liabilityAmount
           dataType: DECIMAL
-        LIABILITY_TS:
-          name: eventData.items.liabilityTs
+        - source: LIABILITY_TS
+          target: eventData.items.liabilityTs
           dataType: DATETIME
           format: "yyyy-MM-dd'T'HH:mm:ss"
-
-      staticFields:
-        eventType: "DataRequest.ItemsRequested"
+        - value: "DataRequest.ItemsRequested"
+          target: eventType
         # Constant company identifier – adjust as needed.
-        eventData.companyId: "1"
+        - value: "1"
+          target: eventData.companyId
 
     # ── Table 2: BATCH_STATUS ─────────────────────────────────────────────────
     #
@@ -140,22 +138,19 @@ outbox:
             FETCHED_AT = CURRENT_TIMESTAMP
         WHERE BATCH_ID = ?
 
-      rowMappingStrategy: CUSTOM
-
-      fieldMappings:
-        RECORD_COUNT:
-          name: eventData.recordCount
+      mappings:
+        - source: RECORD_COUNT
+          target: eventData.recordCount
           dataType: LONG
-        REFERENCE_DATE:
-          name: eventData.referenceDate
+        - source: REFERENCE_DATE
+          target: eventData.referenceDate
           dataType: DATE
           format: "yyyy-MM-dd"
-        BATCH_ID:
-          name: eventData.batchId
+        - source: BATCH_ID
+          target: eventData.batchId
           dataType: LONG
-
-      staticFields:
-        eventType: "BatchStatus.BatchInfoProvided"
+        - value: "BatchStatus.BatchInfoProvided"
+          target: eventType
 
 logging:
   level:

@@ -46,9 +46,9 @@ import static org.awaitility.Awaitility.await;
  * <ul>
  *   <li>Explicit column mapping with dataType and format</li>
  *   <li>Explicit column mapping with valueMappings</li>
- *   <li>Regex pattern mapping (replaces columnPatterns)</li>
- *   <li>Group/list mapping (replaces listMappings)</li>
- *   <li>Static value injection (replaces staticFields)</li>
+ *   <li>Regex pattern mapping</li>
+ *   <li>Group/list mapping</li>
+ *   <li>Static value injection</li>
  * </ul>
  *
  * <p>Uses the {@code product_audit} table which has {@code new_*}/{@code old_*}

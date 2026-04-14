@@ -27,7 +27,7 @@ class MappingRulePayloadMapperTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MappingRulePayloadMapper mapper = new MappingRulePayloadMapper(objectMapper);
 
-    // ── Explicit column mapping (replaces fieldMappings) ─────────────────────
+    // ── Explicit column mapping ─────────────────────────────────────────
 
     @Test
     @SuppressWarnings("unchecked")
@@ -112,7 +112,7 @@ class MappingRulePayloadMapperTest {
         assertThat(payload.get("orderDate")).isEqualTo("2024-03-15");
     }
 
-    // ── Static value injection (replaces staticFields) ───────────────────────
+    // ── Static value injection ───────────────────────────────────────────
 
     @Test
     @SuppressWarnings("unchecked")
@@ -196,7 +196,7 @@ class MappingRulePayloadMapperTest {
                            .doesNotContainKey("orderId"); // not duplicated
     }
 
-    // ── Regex pattern mapping (replaces columnPatterns) ──────────────────────
+    // ── Regex pattern mapping ──────────────────────────────────────────
 
     @Test
     @SuppressWarnings("unchecked")
@@ -241,7 +241,7 @@ class MappingRulePayloadMapperTest {
         assertThat(payload).doesNotContainKey("neu");
     }
 
-    // ── Array grouping (replaces listMappings) ───────────────────────────────
+    // ── Array grouping ───────────────────────────────────────────────────
 
     @Test
     @SuppressWarnings("unchecked")

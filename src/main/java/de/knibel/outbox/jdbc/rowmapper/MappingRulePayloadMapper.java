@@ -18,13 +18,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Unified {@link PayloadMapper} that processes the ordered
+ * {@link PayloadMapper} that processes the ordered
  * {@link MappingRule} list from configuration.
  *
  * <p>Rules are evaluated top-to-bottom.  Once a column is claimed by a
- * rule, later rules skip it.  This replaces the three separate mappers
- * ({@code PayloadColumnMapper}, {@code CamelCasePayloadMapper},
- * {@code CustomFieldPayloadMapper}) with a single implementation.
+ * rule, later rules skip it.
  *
  * @see MappingRule
  */

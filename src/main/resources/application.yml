@@ -127,69 +127,52 @@ outbox:
       # Rows with NULL in this column are treated as pending.
       # processedAtColumn: processed_at
 
-      # ── Row mapping strategy ──────────────────────────────────────────────
+      # ── Row mapping ──────────────────────────────────────────────────────
       # How SQL row columns are mapped to the Kafka record value (payload).
-      # Allowed values: PAYLOAD_COLUMN (default), TO_CAMEL_CASE, CUSTOM.
-
-      # PAYLOAD_COLUMN (default): reads the pre-serialized JSON from payloadColumn.
-      # TO_CAMEL_CASE: selects all columns from the row and converts each
-      #   snake_case column name to camelCase in the resulting JSON payload.
-      # CUSTOM: uses the explicit fieldMappings below to map source columns
-      #   to target JSON paths (supports nested objects via dot-separated paths).
-      # rowMappingStrategy: TO_CAMEL_CASE
-
-      # ── CUSTOM strategy settings ──────────────────────────────────────────
-      # Required only when rowMappingStrategy: CUSTOM.
-      # Keys are source SQL column names; values have:
-      #   - name: target JSON field path (dot-separated for nesting)
-      #   - dataType: (optional) target data type for conversion
-      #     Allowed: STRING, INTEGER, LONG, DOUBLE, BOOLEAN, DECIMAL, DATE, DATETIME
-      #     When omitted, the JDBC driver's default Java mapping is used.
-      #   - format: (required for DATE/DATETIME) date-time format pattern
-      #     Examples: "yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm:ss"
-      #   - valueMappings: (optional) maps raw DB values to output values
-      #     Applied before dataType conversion.
-      #     Example: { "1": ACTIVE, "2": INACTIVE }
-      # Example:
-      #   fieldMappings:
-      #     order_id:
-      #       name: orderId
+      #
+      # By default (when no `mappings` list is configured), the adapter reads
+      # a pre-serialized JSON string from `payloadColumn`.
+      #
+      # To customize mapping, use the `mappings` list.  Rules are evaluated
+      # top-to-bottom; once a column is claimed by a rule, later rules skip it.
+      #
+      # Example: convert all columns to camelCase
+      #   mappings:
+      #     - source: "*"
+      #       target: _camelCase
+      #
+      # Example: explicit column mapping with nested objects
+      #   mappings:
+      #     - source: order_id
+      #       target: orderId
       #       dataType: STRING
-      #     total_amount:
-      #       name: totalAmount
+      #     - source: total_amount
+      #       target: totalAmount
       #       dataType: DOUBLE
-      #     created_at:
-      #       name: createdAt
-      #       dataType: DATETIME
-      #       format: "yyyy-MM-dd'T'HH:mm:ss"
-      #     status_code:
-      #       name: status
-      #       valueMappings:
-      #         "1": ACTIVE
-      #         "2": INACTIVE
-      #     customer_name:
-      #       name: customer.name
-      #     customer_email:
-      #       name: customer.email
-      # Produces: {"orderId":"…","totalAmount":99.95,"createdAt":"2024-01-15T10:30:00","status":"ACTIVE","customer":{"name":"…","email":"…"}}
-
-      # ── List mapping (CUSTOM only) ─────────────────────────────────────
-      # Collects groups of columns matching regex patterns into a JSON
-      # array at the specified target path.  Columns sharing the same
-      # first capturing-group value are merged into one array element.
-      # Keys are target JSON paths; values have:
-      #   - keyProperty: (optional) property name for the captured group
-      #   - patterns: regex-pattern → field mapping
-      # Example:
-      #   listMappings:
-      #     modifications:
-      #       keyProperty: attribute
-      #       patterns:
-      #         "new_(.*)":
-      #           name: after
-      #         "old_(.*)":
-      #           name: before
-      # Produces: {"modifications":[{"attribute":"price","after":10.0,"before":8.0},…]}
+      #     - source: customer_name
+      #       target: customer.name
+      #
+      # Example: inject a static value
+      #   mappings:
+      #     - value: "OrderCreated"
+      #       target: eventType
+      #     - source: "*"
+      #       target: _camelCase
+      #
+      # Example: regex patterns with group/list mapping
+      #   mappings:
+      #     - source: /new_(.*)/
+      #       target: modifications
+      #       group:
+      #         by: $1
+      #         keyProperty: attribute
+      #         property: after
+      #     - source: /old_(.*)/
+      #       target: modifications
+      #       group:
+      #         by: $1
+      #         keyProperty: attribute
+      #         property: before
 logging:
   level:
     org.apache.kafka.clients: WARN
