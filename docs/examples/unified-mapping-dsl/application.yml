@@ -1,0 +1,122 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# sql-outbox-kafka-adapter – Example: unified mapping DSL
+#
+# This configuration demonstrates the unified `mappings` DSL, which replaces
+# the combination of `rowMappingStrategy`, `fieldMappings`, `columnPatterns`,
+# `listMappings`, and `staticFields` with a single ordered rule list.
+#
+# Key benefits:
+#   - Mix and match different mapping strategies in a single table config.
+#   - Rules are evaluated top-to-bottom with precedence: once a column is
+#     claimed by a rule, later rules skip it.
+#   - Composable: explicit mappings + regex patterns + array grouping +
+#     static values + camelCase wildcard, all in one list.
+#
+# Table DDL (PostgreSQL):
+#
+#   CREATE TABLE product_audit (
+#       audit_id        VARCHAR(36)   PRIMARY KEY,
+#       audit_ts        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+#       action          CHAR(1)       NOT NULL DEFAULT 'U',
+#       product_key     VARCHAR(100)  NOT NULL,
+#       new_price       NUMERIC(10,2),
+#       old_price       NUMERIC(10,2),
+#       new_stock       INTEGER,
+#       old_stock       INTEGER,
+#       new_label       VARCHAR(200),
+#       old_label       VARCHAR(200),
+#       status          VARCHAR(20)   NOT NULL DEFAULT 'PENDING'
+#   );
+#
+# Resulting Kafka message value:
+#   {
+#     "timestamp": "2024-03-15T10:30:00",
+#     "action": "UPDATE",
+#     "productKey": "SKU-42",
+#     "eventType": "ProductAudit.Changed",
+#     "modifications": [
+#       {"attribute": "price", "after": 29.99, "before": 24.99},
+#       {"attribute": "stock", "after": 150,   "before": 100},
+#       {"attribute": "label", "after": "Widget Pro", "before": "Widget"}
+#     ]
+#   }
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  application:
+    name: product-audit-outbox-adapter
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydb
+    username: myuser
+    password: mypassword
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+
+outbox:
+
+  kafka:
+    bootstrap-servers: kafka-broker:9092
+
+  tables:
+    - tableName: product_audit
+
+      idColumn: audit_id
+      keyColumn: product_key
+
+      staticTopic: product-audit
+
+      pollIntervalMs: 500
+      batchSize: 100
+
+      acknowledgementStrategy: STATUS
+      statusColumn: status
+      pendingValue: PENDING
+      doneValue: DONE
+
+      # ── Unified mapping rules ────────────────────────────────────────
+      # Rules are evaluated top-to-bottom.  Once a column is claimed by
+      # a rule, later rules skip it.
+      mappings:
+
+        # ① Explicit column mapping with data type and format
+        - source: audit_ts
+          target: timestamp
+          dataType: DATETIME
+          format: "yyyy-MM-dd'T'HH:mm:ss"
+
+        # ② Explicit mapping with value translation
+        - source: action
+          target: action
+          valueMappings:
+            "I": INSERT
+            "U": UPDATE
+            "D": DELETE
+
+        # ③ Simple explicit mapping
+        - source: product_key
+          target: productKey
+
+        # ④ Array grouping: paired new_*/old_* columns → modifications array
+        - source: /new_(.*)/
+          target: modifications
+          group:
+            by: $1
+            keyProperty: attribute
+            property: after
+
+        - source: /old_(.*)/
+          target: modifications
+          group:
+            by: $1
+            keyProperty: attribute
+            property: before
+
+        # ⑤ Static value injection
+        - value: "ProductAudit.Changed"
+          target: eventType
+
+logging:
+  level:
+    org.apache.kafka.clients: WARN

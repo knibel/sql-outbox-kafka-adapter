@@ -353,7 +353,7 @@ public final class RowMapperUtil {
      * Applied <em>after</em> column-based mappings so they can override
      * column-derived values.
      */
-    static void applyStaticFields(Map<String, Object> root, Map<String, String> staticFields) {
+    public static void applyStaticFields(Map<String, Object> root, Map<String, String> staticFields) {
         if (staticFields == null || staticFields.isEmpty()) {
             return;
         }
@@ -369,7 +369,7 @@ public final class RowMapperUtil {
      * If a match is found, returns the mapped string value; otherwise returns
      * the original value unchanged.  Returns {@code null} values unchanged.
      */
-    static Object applyValueMapping(Object value, Map<String, String> valueMappings) {
+    public static Object applyValueMapping(Object value, Map<String, String> valueMappings) {
         if (value == null || valueMappings == null || valueMappings.isEmpty()) {
             return value;
         }
@@ -391,7 +391,7 @@ public final class RowMapperUtil {
      * {@link FieldDataType#DATETIME DATETIME}, the {@code format} parameter
      * specifies the {@link DateTimeFormatter} pattern used for formatting.
      */
-    static Object convertValue(Object value, FieldDataType dataType, String format) {
+    public static Object convertValue(Object value, FieldDataType dataType, String format) {
         if (value == null || dataType == null) {
             return value;
         }
@@ -415,7 +415,7 @@ public final class RowMapperUtil {
     /**
      * Overload without format – delegates with {@code null} format.
      */
-    static Object convertValue(Object value, FieldDataType dataType) {
+    public static Object convertValue(Object value, FieldDataType dataType) {
         return convertValue(value, dataType, null);
     }
 
@@ -472,7 +472,7 @@ public final class RowMapperUtil {
      * produces {@code {"customer":{"address":{"city":"NY"}}}}.
      */
     @SuppressWarnings("unchecked")
-    static void setNestedValue(Map<String, Object> root, String path, Object value) {
+    public static void setNestedValue(Map<String, Object> root, String path, Object value) {
         String[] segments = path.split("\\.");
         Map<String, Object> current = root;
         for (int i = 0; i < segments.length - 1; i++) {
