@@ -38,10 +38,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration test verifying the {@code CUSTOM} row mapping strategy with
+ * Integration test verifying the unified {@code mappings} DSL with
  * date/datetime formatting and integer-to-enum value mapping.
  *
- * <p>The field mappings include:
+ * <p>The mapping rules include:
  * <ul>
  *   <li>{@code order_id → orderId} (dataType: STRING)</li>
  *   <li>{@code created_at → createdAt} (dataType: DATETIME, format: yyyy-MM-dd'T'HH:mm:ss)</li>
@@ -59,20 +59,24 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].statusColumn=status",
                 "outbox.tables[0].pendingValue=PENDING",
                 "outbox.tables[0].doneValue=DONE",
-                "outbox.tables[0].rowMappingStrategy=CUSTOM",
-                "outbox.tables[0].fieldMappings.order_id.name=orderId",
-                "outbox.tables[0].fieldMappings.order_id.dataType=STRING",
-                "outbox.tables[0].fieldMappings.created_at.name=createdAt",
-                "outbox.tables[0].fieldMappings.created_at.dataType=DATETIME",
-                "outbox.tables[0].fieldMappings.created_at.format=yyyy-MM-dd'T'HH:mm:ss",
-                "outbox.tables[0].fieldMappings.order_date.name=orderDate",
-                "outbox.tables[0].fieldMappings.order_date.dataType=DATE",
-                "outbox.tables[0].fieldMappings.order_date.format=yyyy-MM-dd",
-                "outbox.tables[0].fieldMappings.status_code.name=orderStatus",
-                "outbox.tables[0].fieldMappings.status_code.valueMappings.1=ACTIVE",
-                "outbox.tables[0].fieldMappings.status_code.valueMappings.2=INACTIVE",
-                "outbox.tables[0].fieldMappings.status_code.valueMappings.3=DELETED",
-                "outbox.tables[0].fieldMappings.customer_name.name=customer.name",
+                "outbox.tables[0].mappings[0].source=order_id",
+                "outbox.tables[0].mappings[0].target=orderId",
+                "outbox.tables[0].mappings[0].dataType=STRING",
+                "outbox.tables[0].mappings[1].source=created_at",
+                "outbox.tables[0].mappings[1].target=createdAt",
+                "outbox.tables[0].mappings[1].dataType=DATETIME",
+                "outbox.tables[0].mappings[1].format=yyyy-MM-dd'T'HH:mm:ss",
+                "outbox.tables[0].mappings[2].source=order_date",
+                "outbox.tables[0].mappings[2].target=orderDate",
+                "outbox.tables[0].mappings[2].dataType=DATE",
+                "outbox.tables[0].mappings[2].format=yyyy-MM-dd",
+                "outbox.tables[0].mappings[3].source=status_code",
+                "outbox.tables[0].mappings[3].target=orderStatus",
+                "outbox.tables[0].mappings[3].valueMappings.1=ACTIVE",
+                "outbox.tables[0].mappings[3].valueMappings.2=INACTIVE",
+                "outbox.tables[0].mappings[3].valueMappings.3=DELETED",
+                "outbox.tables[0].mappings[4].source=customer_name",
+                "outbox.tables[0].mappings[4].target=customer.name",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
         }

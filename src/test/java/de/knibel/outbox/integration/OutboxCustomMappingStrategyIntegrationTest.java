@@ -38,12 +38,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration test verifying the {@code CUSTOM} row mapping strategy with
- * nested object support.
+ * Integration test verifying the unified {@code mappings} DSL with
+ * nested object support via dot-separated target paths.
  *
  * <ol>
  *   <li>Rows are inserted into a table with flat columns.
- *   <li>The poller picks them up, applies the configured field mappings
+ *   <li>The poller picks them up, applies the configured mapping rules
  *       (including dot-separated paths for nesting), builds a JSON payload,
  *       publishes to Kafka, and marks them {@code DONE}.
  *   <li>A test Kafka consumer verifies the payload has the expected nested
@@ -59,11 +59,14 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].statusColumn=status",
                 "outbox.tables[0].pendingValue=PENDING",
                 "outbox.tables[0].doneValue=DONE",
-                "outbox.tables[0].rowMappingStrategy=CUSTOM",
-                "outbox.tables[0].fieldMappings.order_id.name=orderId",
-                "outbox.tables[0].fieldMappings.customer_name.name=customer.name",
-                "outbox.tables[0].fieldMappings.customer_email.name=customer.email",
-                "outbox.tables[0].fieldMappings.city.name=customer.address.city",
+                "outbox.tables[0].mappings[0].source=order_id",
+                "outbox.tables[0].mappings[0].target=orderId",
+                "outbox.tables[0].mappings[1].source=customer_name",
+                "outbox.tables[0].mappings[1].target=customer.name",
+                "outbox.tables[0].mappings[2].source=customer_email",
+                "outbox.tables[0].mappings[2].target=customer.email",
+                "outbox.tables[0].mappings[3].source=city",
+                "outbox.tables[0].mappings[3].target=customer.address.city",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
         }

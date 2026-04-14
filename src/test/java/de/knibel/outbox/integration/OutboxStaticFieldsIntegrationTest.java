@@ -38,10 +38,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration test for the {@code staticFields} feature.
+ * Integration test for static value injection via the unified {@code mappings} DSL.
  *
- * <p>Verifies that constant values configured in {@code staticFields} are
- * injected into every JSON payload sent to Kafka, including nested paths.
+ * <p>Verifies that constant values configured as mapping rules (with
+ * {@code value} and no {@code source}) are injected into every JSON payload
+ * sent to Kafka, including nested paths.
  */
 @SpringBootTest(
         classes = Application.class,
@@ -52,14 +53,19 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].statusColumn=status",
                 "outbox.tables[0].pendingValue=PENDING",
                 "outbox.tables[0].doneValue=DONE",
-                "outbox.tables[0].rowMappingStrategy=CUSTOM",
-                "outbox.tables[0].fieldMappings.order_id.name=orderId",
-                "outbox.tables[0].fieldMappings.customer_name.name=customer.name",
-                "outbox.tables[0].fieldMappings.amount.name=amount",
-                "outbox.tables[0].fieldMappings.amount.dataType=DOUBLE",
-                // Static fields: a flat constant and a nested constant
-                "outbox.tables[0].staticFields.ereignistyp=Kundenanfrage.BestandsKunden_anfragen",
-                "outbox.tables[0].staticFields.meta.source=outbox-adapter",
+                // Column mapping rules
+                "outbox.tables[0].mappings[0].source=order_id",
+                "outbox.tables[0].mappings[0].target=orderId",
+                "outbox.tables[0].mappings[1].source=customer_name",
+                "outbox.tables[0].mappings[1].target=customer.name",
+                "outbox.tables[0].mappings[2].source=amount",
+                "outbox.tables[0].mappings[2].target=amount",
+                "outbox.tables[0].mappings[2].dataType=DOUBLE",
+                // Static value rules: a flat constant and a nested constant
+                "outbox.tables[0].mappings[3].target=ereignistyp",
+                "outbox.tables[0].mappings[3].value=Kundenanfrage.BestandsKunden_anfragen",
+                "outbox.tables[0].mappings[4].target=meta.source",
+                "outbox.tables[0].mappings[4].value=outbox-adapter",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
         }
