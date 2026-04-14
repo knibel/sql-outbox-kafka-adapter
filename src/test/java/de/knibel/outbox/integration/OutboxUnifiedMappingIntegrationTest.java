@@ -2,7 +2,9 @@ package de.knibel.outbox.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.Application;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,15 +42,24 @@ import static org.awaitility.Awaitility.await;
 /**
  * Integration test verifying the unified {@code mappings} DSL.
  *
- * <p>Uses a mix of explicit column mappings, a static value, and a
- * wildcard camelCase fallback – something impossible with the old
- * single-strategy approach.
+ * <p>Exercises all mapping rule types in a single configuration:
+ * <ul>
+ *   <li>Explicit column mapping with dataType and format</li>
+ *   <li>Explicit column mapping with valueMappings</li>
+ *   <li>Regex pattern mapping (replaces columnPatterns)</li>
+ *   <li>Group/list mapping (replaces listMappings)</li>
+ *   <li>Static value injection (replaces staticFields)</li>
+ * </ul>
+ *
+ * <p>Uses the {@code product_audit} table which has {@code new_*}/{@code old_*}
+ * columns ideal for demonstrating regex and group rules.
  */
 @SpringBootTest(
         classes = Application.class,
         properties = {
-                "outbox.tables[0].tableName=custom_mapping_outbox",
-                "outbox.tables[0].idColumn=id",
+                "outbox.tables[0].tableName=product_audit",
+                "outbox.tables[0].idColumn=audit_id",
+                "outbox.tables[0].keyColumn=product_key",
                 "outbox.tables[0].staticTopic=unified-mapping-topic",
                 "outbox.tables[0].statusColumn=status",
                 "outbox.tables[0].pendingValue=PENDING",
@@ -57,30 +68,41 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].batchSize=10",
 
                 // ── Unified mappings DSL ──
-                // Explicit mapping: order_id → myOrderId
-                "outbox.tables[0].mappings[0].source=order_id",
-                "outbox.tables[0].mappings[0].target=orderId",
-                "outbox.tables[0].mappings[0].dataType=STRING",
 
-                // Nested mapping: customer_name → customer.name
-                "outbox.tables[0].mappings[1].source=customer_name",
-                "outbox.tables[0].mappings[1].target=customer.name",
+                // ① Explicit column mapping with dataType + format
+                "outbox.tables[0].mappings[0].source=audit_ts",
+                "outbox.tables[0].mappings[0].target=timestamp",
+                "outbox.tables[0].mappings[0].dataType=DATETIME",
+                "outbox.tables[0].mappings[0].format=yyyy-MM-dd'T'HH:mm:ss",
 
-                // Nested mapping: customer_email → customer.email
-                "outbox.tables[0].mappings[2].source=customer_email",
-                "outbox.tables[0].mappings[2].target=customer.email",
+                // ② Explicit column mapping with valueMappings
+                "outbox.tables[0].mappings[1].source=action",
+                "outbox.tables[0].mappings[1].target=action",
+                "outbox.tables[0].mappings[1].valueMappings.I=INSERT",
+                "outbox.tables[0].mappings[1].valueMappings.U=UPDATE",
+                "outbox.tables[0].mappings[1].valueMappings.D=DELETE",
 
-                // Deeply nested: city → customer.address.city
-                "outbox.tables[0].mappings[3].source=city",
-                "outbox.tables[0].mappings[3].target=customer.address.city",
+                // ③ Explicit column mapping (simple)
+                "outbox.tables[0].mappings[2].source=product_key",
+                "outbox.tables[0].mappings[2].target=productKey",
 
-                // Static value injection
-                "outbox.tables[0].mappings[4].target=eventType",
-                "outbox.tables[0].mappings[4].value=OrderCreated",
+                // ④ Group/list mapping: new_* columns → modifications[].after
+                "outbox.tables[0].mappings[3].source=/new_(.*)/",
+                "outbox.tables[0].mappings[3].target=modifications",
+                "outbox.tables[0].mappings[3].group.by=$1",
+                "outbox.tables[0].mappings[3].group.keyProperty=attribute",
+                "outbox.tables[0].mappings[3].group.property=after",
 
-                // CamelCase wildcard for remaining columns
-                "outbox.tables[0].mappings[5].source=*",
-                "outbox.tables[0].mappings[5].target=_camelCase",
+                // ⑤ Group/list mapping: old_* columns → modifications[].before
+                "outbox.tables[0].mappings[4].source=/old_(.*)/",
+                "outbox.tables[0].mappings[4].target=modifications",
+                "outbox.tables[0].mappings[4].group.by=$1",
+                "outbox.tables[0].mappings[4].group.keyProperty=attribute",
+                "outbox.tables[0].mappings[4].group.property=before",
+
+                // ⑥ Static value injection
+                "outbox.tables[0].mappings[5].target=eventType",
+                "outbox.tables[0].mappings[5].value=ProductAudit.Changed",
         }
 )
 @Testcontainers
@@ -126,7 +148,7 @@ class OutboxUnifiedMappingIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute("TRUNCATE TABLE custom_mapping_outbox");
+        jdbcTemplate.execute("TRUNCATE TABLE product_audit");
 
         consumer = createConsumer(kafka.getBootstrapServers());
         consumer.subscribe(Collections.singletonList("unified-mapping-topic"));
@@ -140,19 +162,22 @@ class OutboxUnifiedMappingIntegrationTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void shouldPublishWithUnifiedMappingsDsl() throws Exception {
+    void shouldPublishWithAllMappingRuleTypes() throws Exception {
         String id = UUID.randomUUID().toString();
+        Timestamp ts = Timestamp.valueOf(LocalDateTime.of(2024, 3, 15, 10, 30, 0));
         jdbcTemplate.update(
-                "INSERT INTO custom_mapping_outbox (id, order_id, customer_name, customer_email, city, total_amount, is_active, status) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')",
-                id, "ORD-001", "John Doe", "john@example.com", "Berlin", 99.95, true);
+                "INSERT INTO product_audit "
+                + "(audit_id, audit_ts, action, product_key, "
+                + "new_price, old_price, new_stock, old_stock, new_label, old_label, status) "
+                + "VALUES (?, ?, 'U', ?, ?, ?, ?, ?, ?, ?, 'PENDING')",
+                id, ts, "SKU-42", 29.99, 24.99, 150, 100, "Widget Pro", "Widget");
 
         // Wait until the row is marked DONE.
         await().atMost(Duration.ofSeconds(15))
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     String status = jdbcTemplate.queryForObject(
-                            "SELECT status FROM custom_mapping_outbox WHERE id = ?",
+                            "SELECT status FROM product_audit WHERE audit_id = ?",
                             String.class, id);
                     assertThat(status).isEqualTo("DONE");
                 });
@@ -161,28 +186,45 @@ class OutboxUnifiedMappingIntegrationTest {
         List<ConsumerRecord<String, String>> received = pollAllMessages(1);
         assertThat(received).hasSize(1);
 
+        // Key comes from keyColumn=product_key
+        assertThat(received.get(0).key()).isEqualTo("SKU-42");
+
         Map<String, Object> payload = objectMapper.readValue(received.get(0).value(), Map.class);
 
-        // Explicit mapping: order_id → orderId (with STRING dataType)
-        assertThat(payload.get("orderId")).isEqualTo("ORD-001");
+        // ① Explicit mapping with DATETIME format: audit_ts → timestamp
+        assertThat(payload.get("timestamp")).isEqualTo("2024-03-15T10:30:00");
 
-        // Nested mapping: customer_name → customer.name
-        Map<String, Object> customer = (Map<String, Object>) payload.get("customer");
-        assertThat(customer).isNotNull();
-        assertThat(customer.get("name")).isEqualTo("John Doe");
-        assertThat(customer.get("email")).isEqualTo("john@example.com");
+        // ② Explicit mapping with valueMappings: action 'U' → "UPDATE"
+        assertThat(payload.get("action")).isEqualTo("UPDATE");
 
-        // Deeply nested: city → customer.address.city
-        Map<String, Object> address = (Map<String, Object>) customer.get("address");
-        assertThat(address).isNotNull();
-        assertThat(address.get("city")).isEqualTo("Berlin");
+        // ③ Explicit mapping: product_key → productKey
+        assertThat(payload.get("productKey")).isEqualTo("SKU-42");
 
-        // Static value injection
-        assertThat(payload.get("eventType")).isEqualTo("OrderCreated");
+        // ④⑤ Group/list mapping: new_*/old_* → modifications array
+        List<Map<String, Object>> modifications =
+                (List<Map<String, Object>>) payload.get("modifications");
+        assertThat(modifications).isNotNull().hasSize(3);
 
-        // CamelCase wildcard picks up remaining unmapped columns (total_amount, is_active etc.)
-        assertThat(payload).containsKey("totalAmount");
-        assertThat(payload).containsKey("isActive");
+        Map<String, Map<String, Object>> byAttribute = new HashMap<>();
+        for (Map<String, Object> mod : modifications) {
+            byAttribute.put((String) mod.get("attribute"), mod);
+        }
+        assertThat(byAttribute).containsKeys("price", "stock", "label");
+
+        Map<String, Object> priceChange = byAttribute.get("price");
+        assertThat(((Number) priceChange.get("after")).doubleValue()).isEqualTo(29.99);
+        assertThat(((Number) priceChange.get("before")).doubleValue()).isEqualTo(24.99);
+
+        Map<String, Object> stockChange = byAttribute.get("stock");
+        assertThat(stockChange.get("after")).isEqualTo(150);
+        assertThat(stockChange.get("before")).isEqualTo(100);
+
+        Map<String, Object> labelChange = byAttribute.get("label");
+        assertThat(labelChange.get("after")).isEqualTo("Widget Pro");
+        assertThat(labelChange.get("before")).isEqualTo("Widget");
+
+        // ⑥ Static value: eventType
+        assertThat(payload.get("eventType")).isEqualTo("ProductAudit.Changed");
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
