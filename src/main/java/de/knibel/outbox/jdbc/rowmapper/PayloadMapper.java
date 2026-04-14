@@ -17,6 +17,7 @@ import java.sql.SQLException;
  * @see PayloadColumnMapper
  * @see CamelCasePayloadMapper
  * @see CustomFieldPayloadMapper
+ * @see MappingRulePayloadMapper
  */
 public interface PayloadMapper {
 
