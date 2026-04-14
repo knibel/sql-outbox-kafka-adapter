@@ -13,12 +13,12 @@ import java.util.Map;
  * <h3>Rule types</h3>
  * <table>
  *   <tr><th>source</th><th>target</th><th>Behaviour</th></tr>
- *   <tr><td>literal column name</td><td>JSON path</td><td>Explicit column→field mapping (replaces {@code fieldMappings})</td></tr>
- *   <tr><td>{@code /regex/}</td><td>JSON path with back-refs</td><td>Regex pattern mapping (replaces {@code columnPatterns})</td></tr>
- *   <tr><td>{@code /regex/}</td><td>JSON path</td><td>Array grouping when {@code group} is set (replaces {@code listMappings})</td></tr>
+ *   <tr><td>literal column name</td><td>JSON path</td><td>Explicit column→field mapping</td></tr>
+ *   <tr><td>{@code /regex/}</td><td>JSON path with back-refs</td><td>Regex pattern mapping</td></tr>
+ *   <tr><td>{@code /regex/}</td><td>JSON path</td><td>Array grouping when {@code group} is set</td></tr>
  *   <tr><td>{@code *}</td><td>{@code _camelCase}</td><td>Auto-discover all remaining columns, snake→camel (replaces {@code TO_CAMEL_CASE})</td></tr>
  *   <tr><td>literal column name</td><td>{@code _raw}</td><td>Use column value verbatim as entire payload (replaces {@code PAYLOAD_COLUMN})</td></tr>
- *   <tr><td><em>absent</em></td><td>JSON path</td><td>Static constant injection (replaces {@code staticFields})</td></tr>
+ *   <tr><td><em>absent</em></td><td>JSON path</td><td>Static constant injection</td></tr>
  * </table>
  *
  * <h3>Example YAML</h3>

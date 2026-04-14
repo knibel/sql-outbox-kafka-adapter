@@ -3,16 +3,12 @@ package de.knibel.outbox.jdbc;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.OutboxTableProperties;
-import de.knibel.outbox.config.RowMappingStrategy;
 import de.knibel.outbox.domain.OutboxRecord;
 import de.knibel.outbox.jdbc.acknowledgement.CustomAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.DeleteAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.StatusAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.TimestampAcknowledgementHandler;
-import de.knibel.outbox.jdbc.rowmapper.CamelCasePayloadMapper;
-import de.knibel.outbox.jdbc.rowmapper.CustomFieldPayloadMapper;
 import de.knibel.outbox.jdbc.rowmapper.MappingRulePayloadMapper;
-import de.knibel.outbox.jdbc.rowmapper.PayloadColumnMapper;
 import de.knibel.outbox.jdbc.rowmapper.PayloadMapper;
 import de.knibel.outbox.jdbc.selection.CustomQuerySelectionStrategy;
 import de.knibel.outbox.jdbc.selection.SelectionQuery;
@@ -107,16 +103,7 @@ public class JdbcOutboxRepository implements OutboxRepository {
     }
 
     private PayloadMapper resolvePayloadMapper(OutboxTableProperties config) {
-        // New unified mappings take precedence
-        if (config.getMappings() != null && !config.getMappings().isEmpty()) {
-            return new MappingRulePayloadMapper(objectMapper);
-        }
-        // Legacy strategy resolution
-        return switch (config.getRowMappingStrategy()) {
-            case TO_CAMEL_CASE -> new CamelCasePayloadMapper(objectMapper);
-            case CUSTOM        -> new CustomFieldPayloadMapper(objectMapper);
-            default            -> new PayloadColumnMapper();
-        };
+        return new MappingRulePayloadMapper(objectMapper);
     }
 
     private AcknowledgementHandler resolveAcknowledgementHandler(OutboxTableProperties config) {

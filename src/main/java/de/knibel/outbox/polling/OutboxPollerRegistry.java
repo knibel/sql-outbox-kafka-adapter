@@ -2,13 +2,9 @@ package de.knibel.outbox.polling;
 
 import de.knibel.outbox.config.AcknowledgementStrategy;
 import de.knibel.outbox.config.FieldDataType;
-import de.knibel.outbox.config.FieldMapping;
-import de.knibel.outbox.config.ListMapping;
 import de.knibel.outbox.config.MappingRule;
-import de.knibel.outbox.config.MappingRuleLegacyConverter;
 import de.knibel.outbox.config.OutboxProperties;
 import de.knibel.outbox.config.OutboxTableProperties;
-import de.knibel.outbox.config.RowMappingStrategy;
 import de.knibel.outbox.jdbc.SqlIdentifier;
 import de.knibel.outbox.repository.OutboxRepository;
 import de.knibel.outbox.transport.MessageSender;
@@ -90,9 +86,14 @@ public class OutboxPollerRegistry implements SmartLifecycle {
 
         validateConfigs(tables);
 
-        // Convert legacy config to unified mappings if needed
+        // Apply default mapping (payload column → _raw) for tables without explicit mappings
         for (OutboxTableProperties tableConfig : tables) {
-            MappingRuleLegacyConverter.convertIfNeeded(tableConfig);
+            if (tableConfig.getMappings() == null || tableConfig.getMappings().isEmpty()) {
+                MappingRule raw = new MappingRule();
+                raw.setSource(tableConfig.getPayloadColumn());
+                raw.setTarget(MappingRule.TARGET_RAW);
+                tableConfig.setMappings(List.of(raw));
+            }
         }
 
         for (OutboxTableProperties tableConfig : tables) {
@@ -262,143 +263,15 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             // idColumn is always validated because it's used for Kafka key fallback and ack
             SqlIdentifier.quote(cfg.getIdColumn());
 
-            // Validate payloadColumn only when the PAYLOAD_COLUMN strategy is used
-            // and no unified mappings are present
+            // Validate payloadColumn when no mappings are present (default behaviour reads from payloadColumn)
             boolean hasMappings = cfg.getMappings() != null && !cfg.getMappings().isEmpty();
-            RowMappingStrategy rowMapping = cfg.getRowMappingStrategy();
-            if (!hasMappings && rowMapping == RowMappingStrategy.PAYLOAD_COLUMN && !hasCustomQuery) {
+            if (!hasMappings && !hasCustomQuery) {
                 SqlIdentifier.quote(cfg.getPayloadColumn());
             }
 
             // Validate unified mappings if present
             if (hasMappings) {
                 validateMappingRules(name, cfg.getMappings(), hasCustomQuery);
-            }
-
-            // Validate CUSTOM strategy (legacy): at least one of fieldMappings or columnPatterns must be
-            // non-empty; all explicit column names must be safe SQL identifiers; all FieldMapping
-            // entries must have a non-blank name; DATE/DATETIME entries must have a format;
-            // all columnPatterns keys must be valid Java regex patterns.
-            if (!hasMappings && rowMapping == RowMappingStrategy.CUSTOM) {
-                boolean hasFieldMappings = cfg.getFieldMappings() != null && !cfg.getFieldMappings().isEmpty();
-                boolean hasColumnPatterns = cfg.getColumnPatterns() != null && !cfg.getColumnPatterns().isEmpty();
-                boolean hasListMappings = cfg.getListMappings() != null && !cfg.getListMappings().isEmpty();
-                if (!hasFieldMappings && !hasColumnPatterns && !hasListMappings) {
-                    throw new IllegalArgumentException(
-                            "Table '" + name + "': rowMappingStrategy=CUSTOM requires non-empty "
-                            + "'fieldMappings', 'columnPatterns', or 'listMappings'");
-                }
-                if (hasFieldMappings) {
-                    for (var entry : cfg.getFieldMappings().entrySet()) {
-                        if (!hasCustomQuery) {
-                            SqlIdentifier.quote(entry.getKey());
-                        }
-                        FieldMapping mapping = entry.getValue();
-                        if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': fieldMappings entry for column '"
-                                    + entry.getKey() + "' must have a non-blank 'name'");
-                        }
-                        FieldDataType dt = mapping.getDataType();
-                        if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
-                                && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': fieldMappings entry for column '"
-                                    + entry.getKey() + "' with dataType=" + dt
-                                    + " requires a non-blank 'format' pattern");
-                        }
-                    }
-                }
-                if (hasColumnPatterns) {
-                    for (var entry : cfg.getColumnPatterns().entrySet()) {
-                        String patternKey = entry.getKey();
-                        if (patternKey == null || patternKey.isBlank()) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': columnPatterns key must not be blank");
-                        }
-                        try {
-                            Pattern.compile(patternKey);
-                        } catch (PatternSyntaxException e) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': columnPatterns key '"
-                                    + patternKey + "' is not a valid regular expression: " + e.getMessage(), e);
-                        }
-                        FieldMapping mapping = entry.getValue();
-                        if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': columnPatterns entry for pattern '"
-                                    + patternKey + "' must have a non-blank 'name'");
-                        }
-                        FieldDataType dt = mapping.getDataType();
-                        if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
-                                && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': columnPatterns entry for pattern '"
-                                    + patternKey + "' with dataType=" + dt
-                                    + " requires a non-blank 'format' pattern");
-                        }
-                    }
-                }
-                if (hasListMappings) {
-                    for (var listEntry : cfg.getListMappings().entrySet()) {
-                        String targetPath = listEntry.getKey();
-                        if (targetPath == null || targetPath.isBlank()) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': listMappings key (target path) must not be blank");
-                        }
-                        ListMapping listMapping = listEntry.getValue();
-                        if (listMapping == null) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': listMappings entry for path '"
-                                    + targetPath + "' must not be null");
-                        }
-                        if (listMapping.getPatterns() == null || listMapping.getPatterns().isEmpty()) {
-                            throw new IllegalArgumentException(
-                                    "Table '" + name + "': listMappings entry for path '"
-                                    + targetPath + "' must have non-empty 'patterns'");
-                        }
-                        for (var patEntry : listMapping.getPatterns().entrySet()) {
-                            String patternKey = patEntry.getKey();
-                            if (patternKey == null || patternKey.isBlank()) {
-                                throw new IllegalArgumentException(
-                                        "Table '" + name + "': listMappings[" + targetPath
-                                        + "] pattern key must not be blank");
-                            }
-                            try {
-                                Pattern.compile(patternKey);
-                            } catch (PatternSyntaxException e) {
-                                throw new IllegalArgumentException(
-                                        "Table '" + name + "': listMappings[" + targetPath
-                                        + "] pattern key '" + patternKey
-                                        + "' is not a valid regular expression: " + e.getMessage(), e);
-                            }
-                            FieldMapping mapping = patEntry.getValue();
-                            if (mapping == null || mapping.getName() == null || mapping.getName().isBlank()) {
-                                throw new IllegalArgumentException(
-                                        "Table '" + name + "': listMappings[" + targetPath
-                                        + "] pattern '" + patternKey + "' must have a non-blank 'name'");
-                            }
-                            FieldDataType dt = mapping.getDataType();
-                            if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
-                                    && (mapping.getFormat() == null || mapping.getFormat().isBlank())) {
-                                throw new IllegalArgumentException(
-                                        "Table '" + name + "': listMappings[" + targetPath
-                                        + "] pattern '" + patternKey + "' with dataType=" + dt
-                                        + " requires a non-blank 'format' pattern");
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Validate staticFields: paths must be non-blank
-            if (cfg.getStaticFields() != null) {
-                for (var entry : cfg.getStaticFields().entrySet()) {
-                    if (entry.getKey() == null || entry.getKey().isBlank()) {
-                        throw new IllegalArgumentException(
-                                "Table '" + name + "': staticFields key must not be blank");
-                    }
-                }
             }
 
             // Validate CUSTOM acknowledgement strategy

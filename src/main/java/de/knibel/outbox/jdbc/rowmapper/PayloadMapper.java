@@ -7,16 +7,13 @@ import java.sql.SQLException;
 /**
  * Strategy for mapping SQL result-set rows to JSON payload strings.
  *
- * <p>Each implementation corresponds to a
- * {@link de.knibel.outbox.config.RowMappingStrategy} configuration option
- * and defines how the payload is extracted from the result set.
+ * <p>The primary implementation is
+ * {@link MappingRulePayloadMapper}, which processes the ordered
+ * {@link de.knibel.outbox.config.MappingRule} list from configuration.
  *
  * <p>All columns of the row are always selected ({@code SELECT *});
  * the mapper only controls <em>how</em> columns are mapped to a JSON payload.
  *
- * @see PayloadColumnMapper
- * @see CamelCasePayloadMapper
- * @see CustomFieldPayloadMapper
  * @see MappingRulePayloadMapper
  */
 public interface PayloadMapper {

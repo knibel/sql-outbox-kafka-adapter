@@ -1,11 +1,8 @@
 package de.knibel.outbox.config;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Configuration for a single outbox table.
@@ -103,156 +100,17 @@ public class OutboxTableProperties {
     /** Static Kafka topic used when {@code topicColumn} is not set. */
     private String staticTopic;
 
-    // ── Row mapping strategy ─────────────────────────────────────────────────
+    // ── Mappings DSL ────────────────────────────────────────────────────────
 
     /**
-     * How SQL row columns are mapped to the Kafka record value (payload).
-     * Default: {@link RowMappingStrategy#PAYLOAD_COLUMN}.
+     * Mapping rules that define how SQL result-set columns are mapped to
+     * the output JSON payload.
      *
-     * <ul>
-     *   <li>{@code PAYLOAD_COLUMN} – reads the pre-serialized JSON payload from
-     *       a single configured {@code payloadColumn} (original behaviour).
-     *   <li>{@code TO_CAMEL_CASE} – selects all columns and converts every
-     *       {@code snake_case} column name to {@code camelCase} in the resulting
-     *       JSON payload.
-     *   <li>{@code CUSTOM} – uses the explicit {@code fieldMappings} to map
-     *       source columns to target JSON paths (supports nested objects via
-     *       dot-separated paths).
-     * </ul>
-     */
-    private RowMappingStrategy rowMappingStrategy = RowMappingStrategy.PAYLOAD_COLUMN;
-
-    /**
-     * Explicit column-to-JSON-field mappings, used only when
-     * {@code rowMappingStrategy} is {@link RowMappingStrategy#CUSTOM}.
+     * <p>Rules are evaluated top-to-bottom; once a column is claimed by
+     * a rule, later rules skip it.
      *
-     * <p>Keys are source SQL column names; values are {@link FieldMapping}
-     * objects specifying the target JSON field path ({@code name}) and an
-     * optional data type ({@code dataType}) for type conversion.
-     * Dot-separated paths produce nested JSON objects.
-     *
-     * <p>Example:
-     * <pre>
-     *   fieldMappings:
-     *     order_id:
-     *       name: orderId
-     *       dataType: STRING
-     *     total_amount:
-     *       name: totalAmount
-     *       dataType: DOUBLE
-     *     customer_name:
-     *       name: customer.name
-     * </pre>
-     * Produces: {@code {"orderId":"…","totalAmount":99.95,"customer":{"name":"…"}}}
-     */
-    private Map<String, FieldMapping> fieldMappings = new LinkedHashMap<>();
-
-    /**
-     * Regex-pattern-to-JSON-field mappings, used only when
-     * {@code rowMappingStrategy} is {@link RowMappingStrategy#CUSTOM}.
-     *
-     * <p>Keys are Java regular-expression patterns applied against every
-     * column label in the result set using full-string matching
-     * (equivalent to {@link java.util.regex.Matcher#matches()}).
-     * Values are {@link FieldMapping} objects whose {@code name} may contain
-     * back-references ({@code $1}, {@code $2}, …) that are resolved against
-     * the capturing groups of the matched column name.
-     *
-     * <p>Columns already listed in {@code fieldMappings} are excluded from
-     * pattern matching so that explicit mappings always take precedence.
-     *
-     * <p>Example:
-     * <pre>
-     *   columnPatterns:
-     *     "neu_(.*)":
-     *       name: "neu.$1"
-     *     "alt_(.*)":
-     *       name: "alt.$1"
-     * </pre>
-     * A row containing the columns {@code neu_preis=10.0} and
-     * {@code alt_preis=8.0} produces:
-     * {@code {"neu":{"preis":10.0},"alt":{"preis":8.0}}}
-     */
-    private Map<String, FieldMapping> columnPatterns = new LinkedHashMap<>();
-
-    /** Lazily compiled version of {@link #columnPatterns}; invalidated when the map is replaced. */
-    private transient volatile Map<Pattern, FieldMapping> compiledColumnPatterns;
-
-    /**
-     * List-building mappings, used only when
-     * {@code rowMappingStrategy} is {@link RowMappingStrategy#CUSTOM}.
-     *
-     * <p>Keys are target JSON paths where the resulting array is placed
-     * (dot-separated paths produce nested objects just like
-     * {@link FieldMapping#getName()}).  Values are {@link ListMapping}
-     * objects that define regex patterns for collecting columns into
-     * array elements.
-     *
-     * <p>Columns already handled by {@code fieldMappings} or
-     * {@code columnPatterns} are excluded from list mapping.  Within a
-     * list mapping, each column is matched against the patterns; columns
-     * sharing the same first capturing-group value are merged into one
-     * array element.
-     *
-     * <p>Example:
-     * <pre>
-     *   listMappings:
-     *     modifications:
-     *       keyProperty: attribute
-     *       patterns:
-     *         "new_(.*)":
-     *           name: after
-     *         "old_(.*)":
-     *           name: before
-     * </pre>
-     * Given columns {@code new_price=10.0}, {@code old_price=8.0},
-     * {@code new_stock=100}, {@code old_stock=50} produces:
-     * <pre>
-     * "modifications": [
-     *   {"attribute":"price","after":10.0,"before":8.0},
-     *   {"attribute":"stock","after":100,"before":50}
-     * ]
-     * </pre>
-     */
-    private Map<String, ListMapping> listMappings = new LinkedHashMap<>();
-
-    /**
-     * Static key-value pairs injected into every JSON payload.
-     *
-     * <p>Used together with {@link RowMappingStrategy#CUSTOM CUSTOM} or
-     * {@link RowMappingStrategy#TO_CAMEL_CASE TO_CAMEL_CASE} to add
-     * constant values that do not come from a database column (e.g. a
-     * type discriminator).
-     *
-     * <p>Keys are target JSON field paths (dot-separated for nesting,
-     * just like {@link FieldMapping#getName()}).  Values are the constant
-     * string values written to the payload.  Static fields are applied
-     * <em>after</em> column-based mappings, so they can override a
-     * column-derived value if the same path is used.
-     *
-     * <p>Ignored when {@code rowMappingStrategy} is
-     * {@link RowMappingStrategy#PAYLOAD_COLUMN PAYLOAD_COLUMN}.
-     *
-     * <p>Example:
-     * <pre>
-     *   staticFields:
-     *     ereignistyp: "BatchlaufStatus.BatchlaufinfoBereitgestellt"
-     *     meta.source: "outbox-adapter"
-     * </pre>
-     * Produces: {@code {"ereignistyp":"BatchlaufStatus.BatchlaufinfoBereitgestellt","meta":{"source":"outbox-adapter"}}}
-     */
-    private Map<String, String> staticFields = new LinkedHashMap<>();
-
-    // ── Unified mappings DSL ─────────────────────────────────────────────────
-
-    /**
-     * Unified mapping rules that replace the combination of
-     * {@code rowMappingStrategy}, {@code fieldMappings}, {@code columnPatterns},
-     * {@code listMappings}, and {@code staticFields}.
-     *
-     * <p>When this list is non-empty, it takes precedence over all legacy
-     * mapping properties.  Rules are evaluated top-to-bottom; once a column
-     * is claimed by a rule, later rules skip it.
+     * <p>When empty, the adapter falls back to reading the pre-serialized
+     * JSON payload from {@code payloadColumn} (the default behaviour).
      *
      * <p>Example:
      * <pre>
@@ -404,35 +262,6 @@ public class OutboxTableProperties {
     public AcknowledgementStrategy getAcknowledgementStrategy() { return acknowledgementStrategy; }
     public void setAcknowledgementStrategy(AcknowledgementStrategy acknowledgementStrategy) { this.acknowledgementStrategy = acknowledgementStrategy; }
 
-    public RowMappingStrategy getRowMappingStrategy() { return rowMappingStrategy; }
-    public void setRowMappingStrategy(RowMappingStrategy rowMappingStrategy) { this.rowMappingStrategy = rowMappingStrategy; }
-
-    public Map<String, FieldMapping> getFieldMappings() { return fieldMappings; }
-    public void setFieldMappings(Map<String, FieldMapping> fieldMappings) { this.fieldMappings = fieldMappings; }
-
-    public Map<String, FieldMapping> getColumnPatterns() { return columnPatterns; }
-    public void setColumnPatterns(Map<String, FieldMapping> columnPatterns) {
-        this.columnPatterns = columnPatterns;
-        this.compiledColumnPatterns = null; // invalidate cache
-    }
-
-    /**
-     * Returns the {@link #columnPatterns} compiled as {@link Pattern} objects,
-     * keyed by their compiled form.  Patterns are compiled lazily on the first
-     * call and cached for reuse across poll cycles.
-     */
-    public Map<Pattern, FieldMapping> getCompiledColumnPatterns() {
-        Map<Pattern, FieldMapping> cached = compiledColumnPatterns;
-        if (cached == null) {
-            Map<Pattern, FieldMapping> compiled = new LinkedHashMap<>();
-            for (Map.Entry<String, FieldMapping> entry : columnPatterns.entrySet()) {
-                compiled.put(Pattern.compile(entry.getKey()), entry.getValue());
-            }
-            compiledColumnPatterns = cached = Collections.unmodifiableMap(compiled);
-        }
-        return cached;
-    }
-
     public String getProcessedAtColumn() { return processedAtColumn; }
     public void setProcessedAtColumn(String processedAtColumn) { this.processedAtColumn = processedAtColumn; }
 
@@ -444,12 +273,6 @@ public class OutboxTableProperties {
 
     public String getCustomQuery() { return customQuery; }
     public void setCustomQuery(String customQuery) { this.customQuery = customQuery; }
-
-    public Map<String, String> getStaticFields() { return staticFields; }
-    public void setStaticFields(Map<String, String> staticFields) { this.staticFields = staticFields; }
-
-    public Map<String, ListMapping> getListMappings() { return listMappings; }
-    public void setListMappings(Map<String, ListMapping> listMappings) { this.listMappings = listMappings; }
 
     public String getCustomAcknowledgementQuery() { return customAcknowledgementQuery; }
     public void setCustomAcknowledgementQuery(String customAcknowledgementQuery) { this.customAcknowledgementQuery = customAcknowledgementQuery; }

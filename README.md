@@ -77,47 +77,39 @@ Each entry in the `tables` list configures one outbox table.
 | `topicColumn` | _(none)_ | Column used to determine the Kafka topic per row (enables per-row topic routing). When absent, `staticTopic` is used. |
 | `staticTopic` | _(none)_ | Kafka topic used for all rows when `topicColumn` is not set. |
 
-#### Row mapping strategy
+#### Row mapping
 
 Controls how SQL row columns are mapped to the Kafka record value (payload).
 
-| Strategy | Behaviour |
-|---|---|
-| `PAYLOAD_COLUMN` _(default)_ | Reads a pre-serialized JSON string from `payloadColumn`. |
-| `TO_CAMEL_CASE` | Selects all columns and converts each `snake_case` column name to `camelCase` in the resulting JSON payload. No `payloadColumn` needed. |
-| `CUSTOM` | Uses the explicit `fieldMappings` and/or regex-based `columnPatterns` and/or `listMappings` to map source columns to target JSON fields. Supports nested objects via dot-separated paths, data type conversion, date/datetime formatting, value mapping, and collecting column groups into JSON arrays. |
+By default (when no `mappings` list is configured), the adapter reads a
+pre-serialized JSON string from `payloadColumn`.  For customised mapping
+behaviour, use the `mappings` list.
 
-| Property | Default | Description |
-|---|---|---|
-| `rowMappingStrategy` | `PAYLOAD_COLUMN` | One of `PAYLOAD_COLUMN`, `TO_CAMEL_CASE`, `CUSTOM`. |
-| `fieldMappings` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of source SQL column names to field mapping objects. At least one of `fieldMappings`, `columnPatterns`, or `listMappings` must be non-empty. |
-| `columnPatterns` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of Java regex patterns to field mapping objects. Each pattern is matched against the full column label; the `name` may contain back-references (`$1`, `$2`, …). Explicit `fieldMappings` take precedence over patterns. At least one of `fieldMappings`, `columnPatterns`, or `listMappings` must be non-empty. |
-| `listMappings` | _(empty)_ | Used when `rowMappingStrategy` is `CUSTOM`. A map of target JSON paths to list-mapping objects. Collects columns matching regex patterns into JSON arrays, grouped by the first capturing group. See below for details. At least one of `fieldMappings`, `columnPatterns`, or `listMappings` must be non-empty. |
-
-##### Field mapping properties (`fieldMappings.<column>` and `columnPatterns.<pattern>`)
-
-Entries in both `fieldMappings` and `columnPatterns` share the same mapping properties:
+Each mapping rule has the following properties:
 
 | Property | Required | Description |
 |---|---|---|
-| `name` | **yes** | Target JSON field path. Dot-separated paths produce nested objects (e.g. `customer.address.city`). In `columnPatterns`, back-references (`$1`, `$2`, …) may be used to incorporate captured groups from the pattern. In `listMappings`, this is the property name within each array element. |
-| `dataType` | no | Target data type for conversion. One of: `STRING`, `INTEGER`, `LONG`, `DOUBLE`, `BOOLEAN`, `DECIMAL`, `DATE`, `DATETIME`. When omitted, the JDBC driver's default Java mapping is used. |
-| `format` | when `dataType` is `DATE` or `DATETIME` | A `DateTimeFormatter` pattern (e.g. `yyyy-MM-dd`, `yyyy-MM-dd'T'HH:mm:ss`). Accepts `java.sql.Date`, `java.sql.Timestamp`, `LocalDate`, `LocalDateTime`, `Instant`, and `java.util.Date`. |
-| `valueMappings` | no | A map of raw database values (as strings) to replacement output values. Applied _before_ `dataType` conversion. Useful for translating integer codes to enum strings (e.g. `"1": ACTIVE`). Unmapped values pass through unchanged. |
+| `source` | when `value` is absent | Source SQL column name, a regex wrapped in `/…/` (e.g. `/new_(.*)/`), or the wildcard `*`. Mutually exclusive with `value`. |
+| `value` | when `source` is absent | A static string value to inject. Mutually exclusive with `source`. |
+| `target` | **yes** | Target JSON field path (dot-separated for nesting). Special values: `_raw` (pass-through from column) and `_camelCase` (auto-convert all remaining columns). |
+| `dataType` | no | Target data type for conversion. One of: `STRING`, `INTEGER`, `LONG`, `DOUBLE`, `BOOLEAN`, `DECIMAL`, `DATE`, `DATETIME`. |
+| `format` | when `dataType` is `DATE` or `DATETIME` | A `DateTimeFormatter` pattern (e.g. `yyyy-MM-dd`, `yyyy-MM-dd'T'HH:mm:ss`). |
+| `valueMappings` | no | A map of raw database values (as strings) to replacement output values. Applied _before_ `dataType` conversion. |
+| `group` | no | Enables array-grouping for regex sources. See below. |
 
-##### List mapping properties (`listMappings.<targetPath>`)
+##### Group properties (`group`)
 
-Each entry in `listMappings` collects columns matching regex patterns into a
-JSON array at the specified target path.  Columns sharing the same first
-capturing-group value are merged into one array element.
+When present on a mapping rule with a regex `source`, columns matching the
+pattern are collected into a JSON array at the rule's `target` path.
 
 | Property | Required | Description |
 |---|---|---|
-| `keyProperty` | no | Property name in each array element whose value is the first capturing-group match (i.e. the column-name suffix). When omitted, the captured group is used only for grouping and is not included as a property. |
-| `patterns` | **yes** | A map of Java regex patterns to field mapping objects.  Each pattern must contain at least one capturing group.  The first group determines which array element the column value belongs to.  The `name` in the mapping specifies the property name within that element.  `dataType`, `format`, and `valueMappings` are supported. |
+| `by` | **yes** | Capture-group expression (e.g. `$1`) used to correlate columns into the same array element. |
+| `keyProperty` | no | Property name for injecting the captured group value into each array element. |
+| `property` | **yes** | Property name within each element where the column value is placed. |
 
-Precedence: `fieldMappings` > `columnPatterns` > `listMappings`.  A column
-already handled by a higher-precedence mapping is excluded from list processing.
+Rules are evaluated top-to-bottom.  Once a column is claimed by a rule, later
+rules skip it.
 
 #### Acknowledgement strategy
 
@@ -284,7 +276,7 @@ outbox:
       staticTopic: orders
 ```
 
-### TO_CAMEL_CASE row mapping
+### CamelCase row mapping
 
 Converts all column names from `snake_case` to `camelCase` automatically:
 
@@ -295,9 +287,11 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
-      rowMappingStrategy: TO_CAMEL_CASE
       acknowledgementStrategy: STATUS
       statusColumn: status
+      mappings:
+        - source: "*"
+          target: _camelCase
 ```
 
 ```sql
@@ -317,7 +311,7 @@ produces:
 {"id":"…","orderId":"ORD-001","customerName":"John Doe","totalAmount":99.95,"status":"DONE"}
 ```
 
-### CUSTOM row mapping with nested objects
+### Explicit column mapping with nested objects
 
 Map specific columns to target JSON paths, including nested objects via
 dot-separated paths:
@@ -329,18 +323,17 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
-      rowMappingStrategy: CUSTOM
       acknowledgementStrategy: STATUS
       statusColumn: status
-      fieldMappings:
-        order_id:
-          name: orderId
-        customer_name:
-          name: customer.name
-        customer_email:
-          name: customer.email
-        city:
-          name: customer.address.city
+      mappings:
+        - source: order_id
+          target: orderId
+        - source: customer_name
+          target: customer.name
+        - source: customer_email
+          target: customer.email
+        - source: city
+          target: customer.address.city
 ```
 
 Produces:
@@ -358,7 +351,7 @@ Produces:
 }
 ```
 
-### CUSTOM row mapping with data type conversion
+### Data type conversion
 
 Use `dataType` to convert column values to specific types in the JSON output:
 
@@ -369,20 +362,19 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
-      rowMappingStrategy: CUSTOM
-      fieldMappings:
-        order_id:
-          name: orderId
+      mappings:
+        - source: order_id
+          target: orderId
           dataType: STRING
-        total_amount:
-          name: totalAmount
+        - source: total_amount
+          target: totalAmount
           dataType: DOUBLE
-        is_active:
-          name: active
+        - source: is_active
+          target: active
           dataType: BOOLEAN
 ```
 
-### CUSTOM row mapping with date/datetime formatting
+### Date/datetime formatting
 
 Format temporal columns using `DateTimeFormatter` patterns:
 
@@ -393,16 +385,15 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
-      rowMappingStrategy: CUSTOM
-      fieldMappings:
-        order_id:
-          name: orderId
-        created_at:
-          name: createdAt
+      mappings:
+        - source: order_id
+          target: orderId
+        - source: created_at
+          target: createdAt
           dataType: DATETIME
           format: "yyyy-MM-dd'T'HH:mm:ss"
-        order_date:
-          name: orderDate
+        - source: order_date
+          target: orderDate
           dataType: DATE
           format: "yyyy-MM-dd"
 ```
@@ -413,7 +404,7 @@ A row with `created_at=2024-01-15 10:30:45` and `order_date=2024-01-15` produces
 {"orderId":"ORD-001","createdAt":"2024-01-15T10:30:45","orderDate":"2024-01-15"}
 ```
 
-### CUSTOM row mapping with value mapping
+### Value mapping
 
 Translate raw database values (e.g. integer codes) to human-readable strings:
 
@@ -424,18 +415,17 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
-      rowMappingStrategy: CUSTOM
-      fieldMappings:
-        order_id:
-          name: orderId
-        status_code:
-          name: status
+      mappings:
+        - source: order_id
+          target: orderId
+        - source: status_code
+          target: status
           valueMappings:
             "1": ACTIVE
             "2": INACTIVE
             "3": DELETED
-        priority:
-          name: priority
+        - source: priority
+          target: priority
           valueMappings:
             "0": LOW
             "1": MEDIUM
@@ -450,12 +440,11 @@ A row with `status_code=1` and `priority=2` produces:
 
 Values not present in the mapping pass through unchanged.
 
-### CUSTOM row mapping with column patterns (generic prefix mapping)
+### Regex patterns (generic prefix mapping)
 
-Use `columnPatterns` to map groups of columns generically using Java regular
-expressions.  The `name` may contain back-references (`$1`, `$2`, …) that are
-resolved against the capturing groups of the matched column name.  This avoids
-having to list every column individually in `fieldMappings`.
+Use regex sources (wrapped in `/…/`) to map groups of columns generically.
+The `target` may contain back-references (`$1`, `$2`, …) that are resolved
+against the capturing groups.
 
 ```yaml
 outbox:
@@ -464,12 +453,11 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
-      rowMappingStrategy: CUSTOM
-      columnPatterns:
-        "neu_(.*)":
-          name: "neu.$1"
-        "alt_(.*)":
-          name: "alt.$1"
+      mappings:
+        - source: /neu_(.*)/
+          target: "neu.$1"
+        - source: /alt_(.*)/
+          target: "alt.$1"
 ```
 
 A row with columns `neu_preis=10.0`, `neu_menge=2`, `alt_preis=8.0`, and
@@ -482,24 +470,23 @@ A row with columns `neu_preis=10.0`, `neu_menge=2`, `alt_preis=8.0`, and
 }
 ```
 
-You can combine `columnPatterns` with explicit `fieldMappings`.  Explicit
-mappings always take precedence: a column already covered by `fieldMappings`
-is skipped when evaluating patterns.
+You can combine regex patterns with explicit column mappings.  Explicit
+mappings always take precedence: a column already handled by an earlier rule
+is skipped.
 
 ```yaml
-columnPatterns:
-  "neu_(.*)":
-    name: "neu.$1"
-fieldMappings:
-  neu_preis:
-    name: specialPrice   # explicit mapping wins for this column
+mappings:
+  - source: neu_preis
+    target: specialPrice     # explicit mapping wins for this column
     dataType: DOUBLE
+  - source: /neu_(.*)/
+    target: "neu.$1"
 ```
 
-### CUSTOM row mapping with list mappings (paired columns → JSON array)
+### Group mapping (paired columns → JSON array)
 
-Use `listMappings` to collect groups of paired columns into a JSON array.
-Each unique first capturing-group value produces one array element.  This
+Use `group` rules to collect paired columns into a JSON array.
+Each unique capturing-group value produces one array element.  This
 is ideal for tables with paired prefix columns (e.g. `new_*`/`old_*`):
 
 ```yaml
@@ -509,28 +496,31 @@ outbox:
   tables:
     - tableName: product_audit
       staticTopic: product-audit
-      rowMappingStrategy: CUSTOM
-      fieldMappings:
-        audit_ts:
-          name: timestamp
+      mappings:
+        - source: audit_ts
+          target: timestamp
           dataType: DATETIME
           format: "yyyy-MM-dd'T'HH:mm:ss"
-        action:
-          name: action
+        - source: action
+          target: action
           valueMappings:
             "I": INSERT
             "U": UPDATE
             "D": DELETE
-        product_key:
-          name: productKey
-      listMappings:
-        modifications:
-          keyProperty: attribute
-          patterns:
-            "new_(.*)":
-              name: after
-            "old_(.*)":
-              name: before
+        - source: product_key
+          target: productKey
+        - source: /new_(.*)/
+          target: modifications
+          group:
+            by: $1
+            keyProperty: attribute
+            property: after
+        - source: /old_(.*)/
+          target: modifications
+          group:
+            by: $1
+            keyProperty: attribute
+            property: before
 ```
 
 ```sql
@@ -565,7 +555,6 @@ A row with `action='U'`, `product_key='SKU-42'`, `new_price=29.99`,
 }
 ```
 
-You can combine `listMappings` with `fieldMappings` and `columnPatterns`.
-Precedence order: `fieldMappings` > `columnPatterns` > `listMappings`.
-A column already handled by a higher-precedence mapping is excluded from
-list processing.
+You can combine group rules with explicit and regex rules.  Rules are
+evaluated top-to-bottom; a column already handled by an earlier rule is
+excluded from later rules.

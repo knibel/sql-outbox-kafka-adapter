@@ -1,9 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# sql-outbox-kafka-adapter – Example: unified mapping DSL
+# sql-outbox-kafka-adapter – Example: composable mapping rules
 #
-# This configuration demonstrates the unified `mappings` DSL, which replaces
-# the combination of `rowMappingStrategy`, `fieldMappings`, `columnPatterns`,
-# `listMappings`, and `staticFields` with a single ordered rule list.
+# This configuration demonstrates the `mappings` DSL, which provides a
+# single ordered rule list for all column-to-JSON transformations.
 #
 # Key benefits:
 #   - Mix and match different mapping strategies in a single table config.
