@@ -38,7 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration test verifying the {@code TO_CAMEL_CASE} row mapping strategy.
+ * Integration test verifying wildcard camelCase mapping via the unified
+ * {@code mappings} DSL ({@code source=*, target=_camelCase}).
  *
  * <ol>
  *   <li>Rows are inserted into a table with {@code snake_case} columns.
@@ -56,7 +57,8 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].statusColumn=status",
                 "outbox.tables[0].pendingValue=PENDING",
                 "outbox.tables[0].doneValue=DONE",
-                "outbox.tables[0].rowMappingStrategy=TO_CAMEL_CASE",
+                "outbox.tables[0].mappings[0].source=*",
+                "outbox.tables[0].mappings[0].target=_camelCase",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
         }

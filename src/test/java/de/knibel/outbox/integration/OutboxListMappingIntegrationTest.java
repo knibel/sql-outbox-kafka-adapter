@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * Integration test for the {@code listMappings} feature.
+ * Integration test for group/list mapping via the unified {@code mappings} DSL.
  *
  * <p>Verifies that paired {@code new_*}/{@code old_*} columns are collected
  * into a JSON array where each unique suffix produces one array element
@@ -59,20 +59,29 @@ import static org.awaitility.Awaitility.await;
                 "outbox.tables[0].statusColumn=status",
                 "outbox.tables[0].pendingValue=PENDING",
                 "outbox.tables[0].doneValue=DONE",
-                "outbox.tables[0].rowMappingStrategy=CUSTOM",
-                // Fixed columns mapped with fieldMappings
-                "outbox.tables[0].fieldMappings.audit_ts.name=timestamp",
-                "outbox.tables[0].fieldMappings.audit_ts.dataType=DATETIME",
-                "outbox.tables[0].fieldMappings.audit_ts.format=yyyy-MM-dd'T'HH:mm:ss",
-                "outbox.tables[0].fieldMappings.action.name=action",
-                "outbox.tables[0].fieldMappings.action.valueMappings.I=INSERT",
-                "outbox.tables[0].fieldMappings.action.valueMappings.U=UPDATE",
-                "outbox.tables[0].fieldMappings.action.valueMappings.D=DELETE",
-                "outbox.tables[0].fieldMappings.product_key.name=productKey",
-                // Paired columns collected into list via listMappings
-                "outbox.tables[0].listMappings.modifications.keyProperty=attribute",
-                "outbox.tables[0].listMappings.modifications.patterns[new_(.*)].name=after",
-                "outbox.tables[0].listMappings.modifications.patterns[old_(.*)].name=before",
+                // Fixed columns
+                "outbox.tables[0].mappings[0].source=audit_ts",
+                "outbox.tables[0].mappings[0].target=timestamp",
+                "outbox.tables[0].mappings[0].dataType=DATETIME",
+                "outbox.tables[0].mappings[0].format=yyyy-MM-dd'T'HH:mm:ss",
+                "outbox.tables[0].mappings[1].source=action",
+                "outbox.tables[0].mappings[1].target=action",
+                "outbox.tables[0].mappings[1].valueMappings.I=INSERT",
+                "outbox.tables[0].mappings[1].valueMappings.U=UPDATE",
+                "outbox.tables[0].mappings[1].valueMappings.D=DELETE",
+                "outbox.tables[0].mappings[2].source=product_key",
+                "outbox.tables[0].mappings[2].target=productKey",
+                // Paired columns collected into array via group rules
+                "outbox.tables[0].mappings[3].source=/new_(.*)/",
+                "outbox.tables[0].mappings[3].target=modifications",
+                "outbox.tables[0].mappings[3].group.by=$1",
+                "outbox.tables[0].mappings[3].group.keyProperty=attribute",
+                "outbox.tables[0].mappings[3].group.property=after",
+                "outbox.tables[0].mappings[4].source=/old_(.*)/",
+                "outbox.tables[0].mappings[4].target=modifications",
+                "outbox.tables[0].mappings[4].group.by=$1",
+                "outbox.tables[0].mappings[4].group.keyProperty=attribute",
+                "outbox.tables[0].mappings[4].group.property=before",
                 "outbox.tables[0].pollIntervalMs=200",
                 "outbox.tables[0].batchSize=10",
         }
