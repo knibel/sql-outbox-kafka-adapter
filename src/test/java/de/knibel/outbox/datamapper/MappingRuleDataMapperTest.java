@@ -1,10 +1,10 @@
-package de.knibel.outbox.jdbc.rowmapper;
+package de.knibel.outbox.datamapper;
 
+import de.knibel.outbox.config.DataMapperConfig;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.GroupConfig;
 import de.knibel.outbox.config.MappingRule;
 import de.knibel.outbox.config.OutboxTableProperties;
-import de.knibel.outbox.repository.OutboxDataMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,7 +33,7 @@ class MappingRuleDataMapperTest {
     void explicitMapping_mapsColumnToTarget() {
         Map<String, Object> row = rowOf("order_id", "ORD-001", "customer_name", "John Doe");
 
-        OutboxTableProperties config = configWith(
+        DataMapperConfig config = configWith(
                 rule("order_id", "orderId"),
                 rule("customer_name", "customer.name"));
 
@@ -56,7 +56,7 @@ class MappingRuleDataMapperTest {
         MappingRule activeRule = rule("is_active", "active");
         activeRule.setDataType(FieldDataType.BOOLEAN);
 
-        OutboxTableProperties config = configWith(amountRule, activeRule);
+        DataMapperConfig config = configWith(amountRule, activeRule);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -70,7 +70,7 @@ class MappingRuleDataMapperTest {
         MappingRule actionRule = rule("action", "action");
         actionRule.setValueMappings(Map.of("I", "INSERT", "U", "UPDATE", "D", "DELETE"));
 
-        OutboxTableProperties config = configWith(actionRule);
+        DataMapperConfig config = configWith(actionRule);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -91,7 +91,7 @@ class MappingRuleDataMapperTest {
         dateRule.setDataType(FieldDataType.DATE);
         dateRule.setFormat("yyyy-MM-dd");
 
-        OutboxTableProperties config = configWith(datetimeRule, dateRule);
+        DataMapperConfig config = configWith(datetimeRule, dateRule);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -109,7 +109,7 @@ class MappingRuleDataMapperTest {
         staticRule.setTarget("eventType");
         staticRule.setValue("OrderCreated");
 
-        OutboxTableProperties config = configWith(rule("order_id", "orderId"), staticRule);
+        DataMapperConfig config = configWith(rule("order_id", "orderId"), staticRule);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -126,7 +126,7 @@ class MappingRuleDataMapperTest {
                 "customer_first_name", "John",
                 "total_amount", 99.95);
 
-        OutboxTableProperties config = configWith(rule("*", "_camelCase"));
+        DataMapperConfig config = configWith(rule("*", "_camelCase"));
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -145,7 +145,7 @@ class MappingRuleDataMapperTest {
         MappingRule explicit = rule("order_id", "myOrderId");
         MappingRule wildcard = rule("*", "_camelCase");
 
-        OutboxTableProperties config = configWith(explicit, wildcard);
+        DataMapperConfig config = configWith(explicit, wildcard);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -163,7 +163,7 @@ class MappingRuleDataMapperTest {
         Map<String, Object> row = rowOf("neu_preis", 10.0, "neu_menge", 5);
 
         MappingRule regex = rule("/neu_(.*)/", "neu.$1");
-        OutboxTableProperties config = configWith(regex);
+        DataMapperConfig config = configWith(regex);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -178,7 +178,7 @@ class MappingRuleDataMapperTest {
 
         MappingRule explicit = rule("neu_preis", "overridden.preis");
         MappingRule regex = rule("/neu_(.*)/", "neu.$1");
-        OutboxTableProperties config = configWith(explicit, regex);
+        DataMapperConfig config = configWith(explicit, regex);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -197,7 +197,7 @@ class MappingRuleDataMapperTest {
 
         MappingRule newRule = groupRule("/new_(.*)/", "modifications", "$1", "attribute", "after");
         MappingRule oldRule = groupRule("/old_(.*)/", "modifications", "$1", "attribute", "before");
-        OutboxTableProperties config = configWith(newRule, oldRule);
+        DataMapperConfig config = configWith(newRule, oldRule);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -227,7 +227,7 @@ class MappingRuleDataMapperTest {
         MappingRule explicit = rule("new_name", "productName");
         MappingRule newGroup = groupRule("/new_(.*)/", "changes", "$1", "field", "after");
         MappingRule oldGroup = groupRule("/old_(.*)/", "changes", "$1", "field", "before");
-        OutboxTableProperties config = configWith(explicit, newGroup, oldGroup);
+        DataMapperConfig config = configWith(explicit, newGroup, oldGroup);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -255,7 +255,7 @@ class MappingRuleDataMapperTest {
         staticRule.setValue("OrderCreated");
         MappingRule wildcard = rule("*", "_camelCase");
 
-        OutboxTableProperties config = configWith(explicit, staticRule, wildcard);
+        DataMapperConfig config = configWith(explicit, staticRule, wildcard);
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -273,7 +273,7 @@ class MappingRuleDataMapperTest {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("order_id", null);
 
-        OutboxTableProperties config = configWith(rule("order_id", "orderId"));
+        DataMapperConfig config = configWith(rule("order_id", "orderId"));
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -287,7 +287,7 @@ class MappingRuleDataMapperTest {
     void explicitMapping_caseInsensitiveLookup() {
         Map<String, Object> row = rowOf("ORDER_ID", "ORD-001");
 
-        OutboxTableProperties config = configWith(rule("order_id", "orderId"));
+        DataMapperConfig config = configWith(rule("order_id", "orderId"));
 
         Map<String, Object> result = mapper.map(row, config);
 
@@ -316,7 +316,7 @@ class MappingRuleDataMapperTest {
         return rule;
     }
 
-    private static OutboxTableProperties configWith(MappingRule... rules) {
+    private static DataMapperConfig configWith(MappingRule... rules) {
         OutboxTableProperties config = new OutboxTableProperties();
         config.setTableName("test_table");
         List<MappingRule> list = new ArrayList<>();

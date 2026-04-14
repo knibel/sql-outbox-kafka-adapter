@@ -28,7 +28,7 @@ import java.util.Map;
  * All column and table names are validated against {@code ^[a-zA-Z_][a-zA-Z0-9_]*$}
  * at startup and double-quoted in generated SQL to prevent injection.
  */
-public class OutboxTableProperties {
+public class OutboxTableProperties implements DataMapperConfig {
 
     // ── Table / polling ──────────────────────────────────────────────────────
 
@@ -277,6 +277,7 @@ public class OutboxTableProperties {
     public String getCustomAcknowledgementQuery() { return customAcknowledgementQuery; }
     public void setCustomAcknowledgementQuery(String customAcknowledgementQuery) { this.customAcknowledgementQuery = customAcknowledgementQuery; }
 
+    @Override
     public List<MappingRule> getMappings() { return mappings; }
     public void setMappings(List<MappingRule> mappings) { this.mappings = mappings; }
 }

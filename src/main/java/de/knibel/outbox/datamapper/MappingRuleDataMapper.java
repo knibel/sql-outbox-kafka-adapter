@@ -1,9 +1,7 @@
-package de.knibel.outbox.jdbc.rowmapper;
+package de.knibel.outbox.datamapper;
 
+import de.knibel.outbox.config.DataMapperConfig;
 import de.knibel.outbox.config.MappingRule;
-import de.knibel.outbox.config.OutboxTableProperties;
-import de.knibel.outbox.jdbc.RowMapperUtil;
-import de.knibel.outbox.repository.OutboxDataMapper;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -16,7 +14,7 @@ import java.util.regex.Pattern;
 
 /**
  * {@link OutboxDataMapper} implementation that processes the ordered
- * {@link MappingRule} list from configuration.
+ * {@link MappingRule} list from a {@link DataMapperConfig}.
  *
  * <p>This mapper operates on plain {@link Map} input (column-name → value)
  * and is therefore independent of any specific persistence technology such
@@ -42,7 +40,7 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
     public MappingRuleDataMapper() {}
 
     @Override
-    public Map<String, Object> map(Map<String, Object> row, OutboxTableProperties config) {
+    public Map<String, Object> map(Map<String, Object> row, DataMapperConfig config) {
         List<MappingRule> rules = config.getMappings();
         Map<Integer, Pattern> patterns = getCompiledPatterns(rules);
 
@@ -58,7 +56,7 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
             MappingRule rule = rules.get(ruleIndex);
 
             if (rule.isStaticRule()) {
-                RowMapperUtil.setNestedValue(root, rule.getTarget(), rule.getValue());
+                DataMapperUtil.setNestedValue(root, rule.getTarget(), rule.getValue());
                 continue;
             }
 
@@ -68,7 +66,7 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
                     if (handledColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                         continue;
                     }
-                    String camelKey = RowMapperUtil.toCamelCase(columnName);
+                    String camelKey = DataMapperUtil.toCamelCase(columnName);
                     root.put(camelKey, entry.getValue());
                     handledColumns.add(columnName.toLowerCase(Locale.ROOT));
                 }
@@ -91,9 +89,9 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
                 String sourceColumn = rule.getSource();
                 handledColumns.add(sourceColumn.toLowerCase(Locale.ROOT));
                 Object value = findValue(row, sourceColumn);
-                Object mapped = RowMapperUtil.applyValueMapping(value, rule.getValueMappings());
-                Object converted = RowMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
-                RowMapperUtil.setNestedValue(root, rule.getTarget(), converted);
+                Object mapped = DataMapperUtil.applyValueMapping(value, rule.getValueMappings());
+                Object converted = DataMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
+                DataMapperUtil.setNestedValue(root, rule.getTarget(), converted);
             }
         }
 
@@ -113,7 +111,7 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
                 list.add(element);
             }
             if (!list.isEmpty()) {
-                RowMapperUtil.setNestedValue(root, targetPath, list);
+                DataMapperUtil.setNestedValue(root, targetPath, list);
             }
         }
 
@@ -134,9 +132,9 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
             if (matcher.matches()) {
                 String targetName = matcher.replaceAll(rule.getTarget());
                 Object value = entry.getValue();
-                Object mapped = RowMapperUtil.applyValueMapping(value, rule.getValueMappings());
-                Object converted = RowMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
-                RowMapperUtil.setNestedValue(root, targetName, converted);
+                Object mapped = DataMapperUtil.applyValueMapping(value, rule.getValueMappings());
+                Object converted = DataMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
+                DataMapperUtil.setNestedValue(root, targetName, converted);
                 handledColumns.add(columnName.toLowerCase(Locale.ROOT));
             }
         }
@@ -165,8 +163,8 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
             if (matcher.matches() && matcher.groupCount() >= 1) {
                 String capturedKey = matcher.replaceAll(rule.getGroup().getBy());
                 Object value = entry.getValue();
-                Object mapped = RowMapperUtil.applyValueMapping(value, rule.getValueMappings());
-                Object converted = RowMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
+                Object mapped = DataMapperUtil.applyValueMapping(value, rule.getValueMappings());
+                Object converted = DataMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
                 groups.computeIfAbsent(capturedKey, _ -> new LinkedHashMap<>())
                       .put(rule.getGroup().getProperty(), converted);
                 handledColumns.add(columnName.toLowerCase(Locale.ROOT));
