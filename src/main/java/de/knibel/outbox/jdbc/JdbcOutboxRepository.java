@@ -11,6 +11,7 @@ import de.knibel.outbox.jdbc.acknowledgement.StatusAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.TimestampAcknowledgementHandler;
 import de.knibel.outbox.jdbc.rowmapper.CamelCasePayloadMapper;
 import de.knibel.outbox.jdbc.rowmapper.CustomFieldPayloadMapper;
+import de.knibel.outbox.jdbc.rowmapper.MappingRulePayloadMapper;
 import de.knibel.outbox.jdbc.rowmapper.PayloadColumnMapper;
 import de.knibel.outbox.jdbc.rowmapper.PayloadMapper;
 import de.knibel.outbox.jdbc.selection.CustomQuerySelectionStrategy;
@@ -106,6 +107,11 @@ public class JdbcOutboxRepository implements OutboxRepository {
     }
 
     private PayloadMapper resolvePayloadMapper(OutboxTableProperties config) {
+        // New unified mappings take precedence
+        if (config.getMappings() != null && !config.getMappings().isEmpty()) {
+            return new MappingRulePayloadMapper(objectMapper);
+        }
+        // Legacy strategy resolution
         return switch (config.getRowMappingStrategy()) {
             case TO_CAMEL_CASE -> new CamelCasePayloadMapper(objectMapper);
             case CUSTOM        -> new CustomFieldPayloadMapper(objectMapper);

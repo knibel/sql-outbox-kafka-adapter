@@ -1,7 +1,9 @@
 package de.knibel.outbox.config;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -241,6 +243,39 @@ public class OutboxTableProperties {
      */
     private Map<String, String> staticFields = new LinkedHashMap<>();
 
+    // ── Unified mappings DSL ─────────────────────────────────────────────────
+
+    /**
+     * Unified mapping rules that replace the combination of
+     * {@code rowMappingStrategy}, {@code fieldMappings}, {@code columnPatterns},
+     * {@code listMappings}, and {@code staticFields}.
+     *
+     * <p>When this list is non-empty, it takes precedence over all legacy
+     * mapping properties.  Rules are evaluated top-to-bottom; once a column
+     * is claimed by a rule, later rules skip it.
+     *
+     * <p>Example:
+     * <pre>
+     *   mappings:
+     *     - source: order_id
+     *       target: orderId
+     *       dataType: STRING
+     *     - source: /new_(.*)/
+     *       target: modifications
+     *       group:
+     *         by: $1
+     *         keyProperty: attribute
+     *         property: after
+     *     - value: "SomeType"
+     *       target: eventType
+     *     - source: "*"
+     *       target: _camelCase
+     * </pre>
+     *
+     * @see MappingRule
+     */
+    private List<MappingRule> mappings = new ArrayList<>();
+
     // ── Acknowledgement strategy ─────────────────────────────────────────────
 
     /**
@@ -418,4 +453,7 @@ public class OutboxTableProperties {
 
     public String getCustomAcknowledgementQuery() { return customAcknowledgementQuery; }
     public void setCustomAcknowledgementQuery(String customAcknowledgementQuery) { this.customAcknowledgementQuery = customAcknowledgementQuery; }
+
+    public List<MappingRule> getMappings() { return mappings; }
+    public void setMappings(List<MappingRule> mappings) { this.mappings = mappings; }
 }

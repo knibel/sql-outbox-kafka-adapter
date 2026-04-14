@@ -4,6 +4,8 @@ import de.knibel.outbox.config.AcknowledgementStrategy;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.FieldMapping;
 import de.knibel.outbox.config.ListMapping;
+import de.knibel.outbox.config.MappingRule;
+import de.knibel.outbox.config.MappingRuleLegacyConverter;
 import de.knibel.outbox.config.OutboxProperties;
 import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.config.RowMappingStrategy;
@@ -87,6 +89,11 @@ public class OutboxPollerRegistry implements SmartLifecycle {
         }
 
         validateConfigs(tables);
+
+        // Convert legacy config to unified mappings if needed
+        for (OutboxTableProperties tableConfig : tables) {
+            MappingRuleLegacyConverter.convertIfNeeded(tableConfig);
+        }
 
         for (OutboxTableProperties tableConfig : tables) {
             OutboxPoller poller = new OutboxPoller(tableConfig, repository, messageSender, meterRegistry);
@@ -256,16 +263,23 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             SqlIdentifier.quote(cfg.getIdColumn());
 
             // Validate payloadColumn only when the PAYLOAD_COLUMN strategy is used
+            // and no unified mappings are present
+            boolean hasMappings = cfg.getMappings() != null && !cfg.getMappings().isEmpty();
             RowMappingStrategy rowMapping = cfg.getRowMappingStrategy();
-            if (rowMapping == RowMappingStrategy.PAYLOAD_COLUMN && !hasCustomQuery) {
+            if (!hasMappings && rowMapping == RowMappingStrategy.PAYLOAD_COLUMN && !hasCustomQuery) {
                 SqlIdentifier.quote(cfg.getPayloadColumn());
             }
 
-            // Validate CUSTOM strategy: at least one of fieldMappings or columnPatterns must be
+            // Validate unified mappings if present
+            if (hasMappings) {
+                validateMappingRules(name, cfg.getMappings(), hasCustomQuery);
+            }
+
+            // Validate CUSTOM strategy (legacy): at least one of fieldMappings or columnPatterns must be
             // non-empty; all explicit column names must be safe SQL identifiers; all FieldMapping
             // entries must have a non-blank name; DATE/DATETIME entries must have a format;
             // all columnPatterns keys must be valid Java regex patterns.
-            if (rowMapping == RowMappingStrategy.CUSTOM) {
+            if (!hasMappings && rowMapping == RowMappingStrategy.CUSTOM) {
                 boolean hasFieldMappings = cfg.getFieldMappings() != null && !cfg.getFieldMappings().isEmpty();
                 boolean hasColumnPatterns = cfg.getColumnPatterns() != null && !cfg.getColumnPatterns().isEmpty();
                 boolean hasListMappings = cfg.getListMappings() != null && !cfg.getListMappings().isEmpty();
@@ -415,6 +429,117 @@ public class OutboxPollerRegistry implements SmartLifecycle {
             if (cfg.getTransientDbErrorSilenceDurationMs() < 0) {
                 throw new IllegalArgumentException(
                         "Table '" + name + "': 'transientDbErrorSilenceDurationMs' must be >= 0");
+            }
+        }
+    }
+
+    /**
+     * Validates the unified mapping rules for consistency.
+     */
+    private void validateMappingRules(String tableName, List<MappingRule> rules, boolean hasCustomQuery) {
+        if (rules.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Table '" + tableName + "': 'mappings' must not be empty");
+        }
+
+        int rawCount = 0;
+        int camelCaseCount = 0;
+
+        for (int i = 0; i < rules.size(); i++) {
+            MappingRule rule = rules.get(i);
+            String ruleDesc = "mappings[" + i + "]";
+
+            // target is always required
+            if (rule.getTarget() == null || rule.getTarget().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Table '" + tableName + "': " + ruleDesc + " must have a non-blank 'target'");
+            }
+
+            // source and value are mutually exclusive
+            if (rule.getSource() != null && rule.getValue() != null) {
+                throw new IllegalArgumentException(
+                        "Table '" + tableName + "': " + ruleDesc
+                        + " must not have both 'source' and 'value'");
+            }
+
+            // Static rule: value must be present when source is absent
+            if (rule.getSource() == null && rule.getValue() == null) {
+                throw new IllegalArgumentException(
+                        "Table '" + tableName + "': " + ruleDesc
+                        + " must have either 'source' or 'value'");
+            }
+
+            // _raw target
+            if (rule.isRawTarget()) {
+                rawCount++;
+                if (rawCount > 1) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': only one mapping rule may target '_raw'");
+                }
+                if (rule.getSource() == null) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': " + ruleDesc
+                            + " with target '_raw' must have a 'source' column");
+                }
+            }
+
+            // _camelCase target
+            if (rule.isCamelCaseTarget()) {
+                camelCaseCount++;
+                if (camelCaseCount > 1) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': only one mapping rule may target '_camelCase'");
+                }
+                if (!rule.isWildcardSource()) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': " + ruleDesc
+                            + " with target '_camelCase' must use source '*'");
+                }
+            }
+
+            // Regex source validation
+            if (rule.isRegexSource()) {
+                try {
+                    Pattern.compile(rule.getRegexBody());
+                } catch (PatternSyntaxException e) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': " + ruleDesc
+                            + " source regex is invalid: " + e.getMessage(), e);
+                }
+            }
+
+            // Group rule validation
+            if (rule.isGroupRule()) {
+                if (!rule.isRegexSource()) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': " + ruleDesc
+                            + " with 'group' must have a regex source (wrapped in /…/)");
+                }
+                if (rule.getGroup().getBy() == null || rule.getGroup().getBy().isBlank()) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': " + ruleDesc
+                            + " group must have a non-blank 'by'");
+                }
+                if (rule.getGroup().getProperty() == null || rule.getGroup().getProperty().isBlank()) {
+                    throw new IllegalArgumentException(
+                            "Table '" + tableName + "': " + ruleDesc
+                            + " group must have a non-blank 'property'");
+                }
+            }
+
+            // Validate explicit column source as SQL identifier
+            if (rule.getSource() != null && !rule.isRegexSource()
+                    && !rule.isWildcardSource() && !hasCustomQuery) {
+                SqlIdentifier.quote(rule.getSource());
+            }
+
+            // DATE/DATETIME require format
+            FieldDataType dt = rule.getDataType();
+            if ((dt == FieldDataType.DATE || dt == FieldDataType.DATETIME)
+                    && (rule.getFormat() == null || rule.getFormat().isBlank())) {
+                throw new IllegalArgumentException(
+                        "Table '" + tableName + "': " + ruleDesc
+                        + " with dataType=" + dt + " requires a non-blank 'format' pattern");
             }
         }
     }
