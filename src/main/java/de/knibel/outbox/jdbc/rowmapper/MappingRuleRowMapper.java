@@ -1,15 +1,9 @@
 package de.knibel.outbox.jdbc.rowmapper;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.MappingRule;
-import de.knibel.outbox.config.OutboxTableProperties;
 import de.knibel.outbox.jdbc.RowMapperUtil;
 import de.knibel.outbox.repository.OutboxRowMapper;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,39 +14,48 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Unified {@link PayloadMapper} that processes the ordered
+ * Unified {@link OutboxRowMapper} that processes the ordered
  * {@link MappingRule} list from configuration.
  *
  * <p>Rules are evaluated top-to-bottom.  Once a column is claimed by a
  * rule, later rules skip it.  This replaces the three separate mappers
- * ({@code PayloadColumnMapper}, {@code CamelCasePayloadMapper},
- * {@code CustomFieldPayloadMapper}) with a single implementation.
+ * with a single implementation.
  *
- * @deprecated Use {@link MappingRuleRowMapper} instead.
+ * <p>Operates entirely on a plain {@code Map<String, Object>} — no JDBC
+ * or Jackson dependency at mapping time.
+ *
+ * <p><b>Special case – raw target:</b> when a rule has target
+ * {@code _raw}, the mapper returns a single-entry map whose key is
+ * the source column name and whose value is the raw column value.
+ * The adapter layer is responsible for extracting the string value.
+ *
  * @see MappingRule
+ * @see MappingRulePayloadMapper
  */
-@Deprecated(since = "0.4.0", forRemoval = true)
-@SuppressWarnings("removal") // Implements own deprecated PayloadMapper
-public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper {
+@SuppressWarnings("removal") // Intentionally implements deprecated PayloadMapper during transition
+public class MappingRuleRowMapper implements PayloadMapper, OutboxRowMapper {
 
-    private final ObjectMapper objectMapper;
+    private final List<MappingRule> rules;
 
     /** Pre-compiled regex patterns cached per rule index. */
     private volatile Map<Integer, Pattern> compiledPatterns;
 
-    public MappingRulePayloadMapper(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    /**
+     * @param rules ordered list of mapping rules (never {@code null})
+     */
+    public MappingRuleRowMapper(List<MappingRule> rules) {
+        this.rules = rules;
     }
 
     @Override
-    public String mapPayload(ResultSet rs, OutboxTableProperties config) throws SQLException {
-        List<MappingRule> rules = config.getMappings();
+    public Map<String, Object> mapRow(Map<String, Object> row) {
         Map<Integer, Pattern> patterns = getCompiledPatterns(rules);
 
         // Check for raw target first – it short-circuits everything
         for (MappingRule rule : rules) {
             if (rule.isRawTarget() && rule.getSource() != null) {
-                return rs.getString(rule.getSource());
+                Object value = row.get(rule.getSource());
+                return Map.of(rule.getSource(), value != null ? value : "");
             }
         }
 
@@ -61,12 +64,7 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
 
         // Intermediate group state: targetPath → (capturedKey → {property → value})
         Map<String, Map<String, Map<String, Object>>> groupState = new LinkedHashMap<>();
-        // Track keyProperty and group configs per target path
         Map<String, String> groupKeyProperties = new LinkedHashMap<>();
-
-        // Lazily load metadata only when needed
-        ResultSetMetaData meta = null;
-        int columnCount = 0;
 
         for (int ruleIndex = 0; ruleIndex < rules.size(); ruleIndex++) {
             MappingRule rule = rules.get(ruleIndex);
@@ -77,18 +75,13 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
             }
 
             if (rule.isCamelCaseTarget() && rule.isWildcardSource()) {
-                if (meta == null) {
-                    meta = rs.getMetaData();
-                    columnCount = meta.getColumnCount();
-                }
-                for (int i = 1; i <= columnCount; i++) {
-                    String columnName = meta.getColumnLabel(i);
+                for (Map.Entry<String, Object> entry : row.entrySet()) {
+                    String columnName = entry.getKey();
                     if (handledColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                         continue;
                     }
                     String camelKey = RowMapperUtil.toCamelCase(columnName);
-                    Object value = rs.getObject(i);
-                    root.put(camelKey, value);
+                    root.put(camelKey, entry.getValue());
                     handledColumns.add(columnName.toLowerCase(Locale.ROOT));
                 }
                 continue;
@@ -96,16 +89,12 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
 
             if (rule.isRegexSource()) {
                 Pattern pattern = patterns.get(ruleIndex);
-                if (meta == null) {
-                    meta = rs.getMetaData();
-                    columnCount = meta.getColumnCount();
-                }
 
                 if (rule.isGroupRule()) {
-                    processGroupRule(rs, meta, columnCount, rule, pattern,
+                    processGroupRule(row, rule, pattern,
                             handledColumns, groupState, groupKeyProperties);
                 } else {
-                    processRegexRule(rs, meta, columnCount, rule, pattern, handledColumns, root);
+                    processRegexRule(row, rule, pattern, handledColumns, root);
                 }
                 continue;
             }
@@ -113,14 +102,14 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
             if (rule.getSource() != null && !rule.isWildcardSource()) {
                 String sourceColumn = rule.getSource();
                 handledColumns.add(sourceColumn.toLowerCase(Locale.ROOT));
-                Object value = rs.getObject(sourceColumn);
+                Object value = row.get(sourceColumn);
                 Object mapped = RowMapperUtil.applyValueMapping(value, rule.getValueMappings());
                 Object converted = RowMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
                 RowMapperUtil.setNestedValue(root, rule.getTarget(), converted);
             }
         }
 
-        // Finalize all group rules: convert grouped entries to JSON arrays
+        // Finalize all group rules: convert grouped entries to arrays
         for (Map.Entry<String, Map<String, Map<String, Object>>> groupEntry : groupState.entrySet()) {
             String targetPath = groupEntry.getKey();
             Map<String, Map<String, Object>> groups = groupEntry.getValue();
@@ -140,28 +129,23 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
             }
         }
 
-        try {
-            return objectMapper.writeValueAsString(root);
-        } catch (Exception e) {
-            throw new SQLException("Failed to serialize payload to JSON", e);
-        }
+        return root;
     }
 
     // ── Regex pattern mapping ────────────────────────────────────────────────
 
-    private void processRegexRule(ResultSet rs, ResultSetMetaData meta, int columnCount,
-                                  MappingRule rule, Pattern pattern,
-                                  Set<String> handledColumns, Map<String, Object> root)
-            throws SQLException {
-        for (int i = 1; i <= columnCount; i++) {
-            String columnName = meta.getColumnLabel(i);
+    private void processRegexRule(Map<String, Object> row, MappingRule rule,
+                                  Pattern pattern, Set<String> handledColumns,
+                                  Map<String, Object> root) {
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            String columnName = entry.getKey();
             if (handledColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                 continue;
             }
             Matcher matcher = pattern.matcher(columnName);
             if (matcher.matches()) {
                 String targetName = matcher.replaceAll(rule.getTarget());
-                Object value = rs.getObject(i);
+                Object value = entry.getValue();
                 Object mapped = RowMapperUtil.applyValueMapping(value, rule.getValueMappings());
                 Object converted = RowMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
                 RowMapperUtil.setNestedValue(root, targetName, converted);
@@ -172,28 +156,25 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
 
     // ── Array grouping ───────────────────────────────────────────────────────
 
-    private void processGroupRule(ResultSet rs, ResultSetMetaData meta, int columnCount,
-                                  MappingRule rule, Pattern pattern,
-                                  Set<String> handledColumns,
+    private void processGroupRule(Map<String, Object> row, MappingRule rule,
+                                  Pattern pattern, Set<String> handledColumns,
                                   Map<String, Map<String, Map<String, Object>>> groupState,
-                                  Map<String, String> groupKeyProperties)
-            throws SQLException {
+                                  Map<String, String> groupKeyProperties) {
         String targetPath = rule.getTarget();
         Map<String, Map<String, Object>> groups =
                 groupState.computeIfAbsent(targetPath, _ -> new LinkedHashMap<>());
 
-        // Record keyProperty – first rule wins if multiple rules target same path
         groupKeyProperties.putIfAbsent(targetPath, rule.getGroup().getKeyProperty());
 
-        for (int i = 1; i <= columnCount; i++) {
-            String columnName = meta.getColumnLabel(i);
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            String columnName = entry.getKey();
             if (handledColumns.contains(columnName.toLowerCase(Locale.ROOT))) {
                 continue;
             }
             Matcher matcher = pattern.matcher(columnName);
             if (matcher.matches() && matcher.groupCount() >= 1) {
                 String capturedKey = matcher.replaceAll(rule.getGroup().getBy());
-                Object value = rs.getObject(i);
+                Object value = entry.getValue();
                 Object mapped = RowMapperUtil.applyValueMapping(value, rule.getValueMappings());
                 Object converted = RowMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
                 groups.computeIfAbsent(capturedKey, _ -> new LinkedHashMap<>())
@@ -220,13 +201,27 @@ public class MappingRulePayloadMapper implements PayloadMapper, OutboxRowMapper 
         return cached;
     }
 
-    /**
-     * Not meaningful for this mapper — configuration (rules) is not
-     * available at construction time.  Use {@link MappingRuleRowMapper}
-     * for proper {@code Map}-based mapping.
-     */
+    // ── PayloadMapper bridge (deprecated path) ───────────────────────────────
+
     @Override
-    public Map<String, Object> mapRow(Map<String, Object> row) {
-        return Collections.emptyMap();
+    public String mapPayload(java.sql.ResultSet rs,
+                             de.knibel.outbox.config.OutboxTableProperties config)
+            throws java.sql.SQLException {
+        try {
+            Map<String, Object> row = de.knibel.outbox.jdbc.ResultSetConverter.toMap(rs);
+            Map<String, Object> result = mapRow(row);
+
+            // Handle raw target: return the source column value as-is
+            for (MappingRule rule : rules) {
+                if (rule.isRawTarget() && rule.getSource() != null) {
+                    Object rawValue = result.get(rule.getSource());
+                    return rawValue != null ? rawValue.toString() : null;
+                }
+            }
+
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(result);
+        } catch (Exception e) {
+            throw new java.sql.SQLException("Failed to build mapping-rule payload", e);
+        }
     }
 }

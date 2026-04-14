@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 /**
  * Unit tests for the unified {@link MappingRulePayloadMapper}.
  */
+@SuppressWarnings("removal") // Testing deprecated MappingRulePayloadMapper
 class MappingRulePayloadMapperTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();

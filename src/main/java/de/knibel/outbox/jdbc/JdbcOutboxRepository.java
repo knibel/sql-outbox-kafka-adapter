@@ -3,23 +3,22 @@ package de.knibel.outbox.jdbc;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.knibel.outbox.config.OutboxTableProperties;
-import de.knibel.outbox.config.RowMappingStrategy;
 import de.knibel.outbox.domain.OutboxRecord;
 import de.knibel.outbox.jdbc.acknowledgement.CustomAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.DeleteAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.StatusAcknowledgementHandler;
 import de.knibel.outbox.jdbc.acknowledgement.TimestampAcknowledgementHandler;
-import de.knibel.outbox.jdbc.rowmapper.CamelCasePayloadMapper;
-import de.knibel.outbox.jdbc.rowmapper.CustomFieldPayloadMapper;
-import de.knibel.outbox.jdbc.rowmapper.MappingRulePayloadMapper;
-import de.knibel.outbox.jdbc.rowmapper.PayloadColumnMapper;
-import de.knibel.outbox.jdbc.rowmapper.PayloadMapper;
+import de.knibel.outbox.jdbc.rowmapper.CamelCaseRowMapper;
+import de.knibel.outbox.jdbc.rowmapper.CustomFieldRowMapper;
+import de.knibel.outbox.jdbc.rowmapper.MappingRuleRowMapper;
+import de.knibel.outbox.jdbc.rowmapper.PayloadColumnRowMapper;
 import de.knibel.outbox.jdbc.selection.CustomQuerySelectionStrategy;
 import de.knibel.outbox.jdbc.selection.SelectionQuery;
 import de.knibel.outbox.jdbc.selection.SelectionStrategy;
 import de.knibel.outbox.jdbc.selection.SimpleSelectionStrategy;
 import de.knibel.outbox.repository.AcknowledgementHandler;
 import de.knibel.outbox.repository.OutboxRepository;
+import de.knibel.outbox.repository.OutboxRowMapper;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
  * JDBC-based implementation of {@link OutboxRepository}.
  *
  * <p>Uses {@link SelectionStrategy} to build the claim query and
- * {@link PayloadMapper} to map result-set rows to JSON payloads.
+ * {@link OutboxRowMapper} to map result-set rows to structured payload
+ * maps, which are then serialized to JSON via Jackson.
  *
  * <p><b>SQL injection prevention:</b> all column and table names from
  * configuration are validated and double-quoted by {@link SqlIdentifier}.
@@ -79,13 +79,13 @@ public class JdbcOutboxRepository implements OutboxRepository {
     @Override
     @Transactional
     public List<OutboxRecord> claimBatch(OutboxTableProperties config) {
-        PayloadMapper payloadMapper = resolvePayloadMapper(config);
+        OutboxRowMapper rowMapper = resolveRowMapper(config);
         SelectionStrategy selectionStrategy = resolveSelectionStrategy(config);
 
         SelectionQuery query = selectionStrategy.buildClaimQuery(config);
 
         return jdbc.query(query.sql(),
-                (rs, rowNum) -> mapRow(rs, config, payloadMapper),
+                (rs, rowNum) -> mapRow(rs, config, rowMapper),
                 query.params());
     }
 
@@ -106,16 +106,24 @@ public class JdbcOutboxRepository implements OutboxRepository {
         return new SimpleSelectionStrategy();
     }
 
-    private PayloadMapper resolvePayloadMapper(OutboxTableProperties config) {
+    private OutboxRowMapper resolveRowMapper(OutboxTableProperties config) {
         // New unified mappings take precedence
         if (config.getMappings() != null && !config.getMappings().isEmpty()) {
-            return new MappingRulePayloadMapper(objectMapper);
+            // Check for raw target shortcut – use PayloadColumnRowMapper directly
+            for (var rule : config.getMappings()) {
+                if (rule.isRawTarget() && rule.getSource() != null) {
+                    return new PayloadColumnRowMapper(rule.getSource());
+                }
+            }
+            return new MappingRuleRowMapper(config.getMappings());
         }
         // Legacy strategy resolution
         return switch (config.getRowMappingStrategy()) {
-            case TO_CAMEL_CASE -> new CamelCasePayloadMapper(objectMapper);
-            case CUSTOM        -> new CustomFieldPayloadMapper(objectMapper);
-            default            -> new PayloadColumnMapper();
+            case TO_CAMEL_CASE -> new CamelCaseRowMapper(config.getStaticFields());
+            case CUSTOM        -> new CustomFieldRowMapper(
+                    config.getFieldMappings(), config.getCompiledColumnPatterns(),
+                    config.getListMappings(), config.getStaticFields());
+            default            -> new PayloadColumnRowMapper(config.getPayloadColumn());
         };
     }
 
@@ -132,7 +140,7 @@ public class JdbcOutboxRepository implements OutboxRepository {
 
     /** Maps a result-set row to an {@link OutboxRecord}. */
     private OutboxRecord mapRow(java.sql.ResultSet rs, OutboxTableProperties config,
-                                PayloadMapper payloadMapper)
+                                OutboxRowMapper rowMapper)
             throws java.sql.SQLException {
         String id = rs.getString(config.getIdColumn());
 
@@ -154,7 +162,16 @@ public class JdbcOutboxRepository implements OutboxRepository {
 
         String payload;
         try {
-            payload = payloadMapper.mapPayload(rs, config);
+            Map<String, Object> row = ResultSetConverter.toMap(rs);
+            Map<String, Object> mapped = rowMapper.mapRow(row);
+
+            // PayloadColumnRowMapper returns the raw column value as-is
+            if (rowMapper instanceof PayloadColumnRowMapper pcm) {
+                Object raw = mapped.get(pcm.getPayloadColumn());
+                payload = raw != null ? raw.toString() : null;
+            } else {
+                payload = objectMapper.writeValueAsString(mapped);
+            }
         } catch (Exception e) {
             log.warn("Failed to build payload for table '{}', row id='{}': {}",
                     config.getTableName(), id, e.getMessage());

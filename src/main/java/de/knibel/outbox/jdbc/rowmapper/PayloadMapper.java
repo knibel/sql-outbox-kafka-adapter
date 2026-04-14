@@ -14,11 +14,19 @@ import java.sql.SQLException;
  * <p>All columns of the row are always selected ({@code SELECT *});
  * the mapper only controls <em>how</em> columns are mapped to a JSON payload.
  *
+ * @deprecated Use {@link de.knibel.outbox.repository.OutboxRowMapper} instead.
+ *             This interface couples mapping logic to JDBC ({@code ResultSet})
+ *             and serialization (returns JSON string).  The new
+ *             {@code OutboxRowMapper} works with plain {@code Map<String, Object>}
+ *             and is persistence/serialization-independent.
+ *
  * @see PayloadColumnMapper
  * @see CamelCasePayloadMapper
  * @see CustomFieldPayloadMapper
  * @see MappingRulePayloadMapper
+ * @see de.knibel.outbox.repository.OutboxRowMapper
  */
+@Deprecated(since = "0.4.0", forRemoval = true)
 public interface PayloadMapper {
 
     /**

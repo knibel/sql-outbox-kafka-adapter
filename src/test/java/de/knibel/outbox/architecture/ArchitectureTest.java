@@ -4,9 +4,9 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
-import de.knibel.outbox.jdbc.rowmapper.PayloadMapper;
 import de.knibel.outbox.jdbc.selection.SelectionStrategy;
 import de.knibel.outbox.repository.AcknowledgementHandler;
+import de.knibel.outbox.repository.OutboxRowMapper;
 import de.knibel.outbox.transport.MessageTransport;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
@@ -64,7 +64,7 @@ class ArchitectureTest {
     static final ArchRule payload_mappers_implement_interface =
             classes().that().resideInAPackage("..jdbc.rowmapper..")
                     .and().areNotInterfaces()
-                    .should().implement(PayloadMapper.class);
+                    .should().implement(OutboxRowMapper.class);
 
     @ArchTest
     static final ArchRule acknowledgement_handlers_implement_interface =
