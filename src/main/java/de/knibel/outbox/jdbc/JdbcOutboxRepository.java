@@ -162,14 +162,13 @@ public class JdbcOutboxRepository implements OutboxRepository {
 
         String payload;
         try {
-            Map<String, Object> row = ResultSetConverter.toMap(rs);
-            Map<String, Object> mapped = rowMapper.mapRow(row);
-
-            // PayloadColumnRowMapper returns the raw column value as-is
+            // PayloadColumnRowMapper: read the raw string directly via
+            // rs.getString() to handle database-specific types (e.g. Oracle CLOB)
             if (rowMapper instanceof PayloadColumnRowMapper pcm) {
-                Object raw = mapped.get(pcm.getPayloadColumn());
-                payload = raw != null ? raw.toString() : null;
+                payload = rs.getString(pcm.getPayloadColumn());
             } else {
+                Map<String, Object> row = ResultSetConverter.toMap(rs);
+                Map<String, Object> mapped = rowMapper.mapRow(row);
                 payload = objectMapper.writeValueAsString(mapped);
             }
         } catch (Exception e) {
