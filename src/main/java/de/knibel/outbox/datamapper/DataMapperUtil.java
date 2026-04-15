@@ -1,4 +1,4 @@
-package de.knibel.outbox.jdbc;
+package de.knibel.outbox.datamapper;
 
 import de.knibel.outbox.config.FieldDataType;
 import java.math.BigDecimal;
@@ -11,16 +11,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Utility methods for mapping SQL result-set rows to JSON payloads.
+ * Utility methods for mapping data rows to structured output maps.
  *
  * <p>Provides helpers for snake→camelCase conversion, value mapping,
- * data type conversion, date/datetime formatting, and nested JSON
- * path handling.  Used by
- * {@link de.knibel.outbox.jdbc.rowmapper.MappingRulePayloadMapper}.
+ * data type conversion, date/datetime formatting, and nested map
+ * path handling.  Used by {@link MappingRuleDataMapper}.
  */
-public final class RowMapperUtil {
+public final class DataMapperUtil {
 
-    private RowMapperUtil() {}
+    private DataMapperUtil() {}
 
     // ── Snake-case → camelCase conversion ────────────────────────────────────
 

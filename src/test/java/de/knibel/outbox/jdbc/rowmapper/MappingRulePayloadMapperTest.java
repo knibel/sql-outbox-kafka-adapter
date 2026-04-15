@@ -220,14 +220,9 @@ class MappingRulePayloadMapperTest {
     @Test
     @SuppressWarnings("unchecked")
     void regexMapping_explicitTakesPrecedence() throws Exception {
-        ResultSetMetaData meta = mock(ResultSetMetaData.class);
-        when(meta.getColumnCount()).thenReturn(1);
-        when(meta.getColumnLabel(1)).thenReturn("neu_preis");
-
-        ResultSet rs = mock(ResultSet.class);
-        when(rs.getMetaData()).thenReturn(meta);
-        when(rs.getObject("neu_preis")).thenReturn("explicit_val");
-        when(rs.getObject(1)).thenReturn("pattern_val");
+        ResultSet rs = mockResultSet(
+                List.of("neu_preis"),
+                List.of("the_value"));
 
         MappingRule explicit = rule("neu_preis", "overridden.preis");
         MappingRule regex = rule("/neu_(.*)/", "neu.$1");
@@ -237,7 +232,7 @@ class MappingRulePayloadMapperTest {
         Map<String, Object> payload = objectMapper.readValue(json, Map.class);
 
         Map<String, Object> overridden = (Map<String, Object>) payload.get("overridden");
-        assertThat(overridden).containsEntry("preis", "explicit_val");
+        assertThat(overridden).containsEntry("preis", "the_value");
         assertThat(payload).doesNotContainKey("neu");
     }
 
@@ -316,18 +311,9 @@ class MappingRulePayloadMapperTest {
     @Test
     @SuppressWarnings("unchecked")
     void groupRule_fieldMappingsTakePrecedence() throws Exception {
-        ResultSetMetaData meta = mock(ResultSetMetaData.class);
-        when(meta.getColumnCount()).thenReturn(3);
-        when(meta.getColumnLabel(1)).thenReturn("new_price");
-        when(meta.getColumnLabel(2)).thenReturn("old_price");
-        when(meta.getColumnLabel(3)).thenReturn("new_name");
-
-        ResultSet rs = mock(ResultSet.class);
-        when(rs.getMetaData()).thenReturn(meta);
-        when(rs.getObject("new_name")).thenReturn("explicit_value");
-        when(rs.getObject(1)).thenReturn(10.0);
-        when(rs.getObject(2)).thenReturn(8.0);
-        when(rs.getObject(3)).thenReturn("pattern_value");
+        ResultSet rs = mockResultSet(
+                List.of("new_price", "old_price", "new_name"),
+                List.of(10.0, 8.0, "the_name"));
 
         MappingRule explicit = rule("new_name", "productName");
         MappingRule newGroup = groupRule("/new_(.*)/", "changes", "$1", "field", "after");
@@ -338,7 +324,7 @@ class MappingRulePayloadMapperTest {
         Map<String, Object> payload = objectMapper.readValue(json, Map.class);
 
         // Explicit mapping wins
-        assertThat(payload.get("productName")).isEqualTo("explicit_value");
+        assertThat(payload.get("productName")).isEqualTo("the_name");
 
         // List should only contain price (name was handled by explicit mapping)
         List<Map<String, Object>> changes = (List<Map<String, Object>>) payload.get("changes");

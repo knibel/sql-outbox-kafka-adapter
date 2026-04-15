@@ -4,6 +4,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import de.knibel.outbox.datamapper.OutboxDataMapper;
 import de.knibel.outbox.jdbc.rowmapper.PayloadMapper;
 import de.knibel.outbox.jdbc.selection.SelectionStrategy;
 import de.knibel.outbox.repository.AcknowledgementHandler;
@@ -19,6 +20,7 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
  * <p>Key architectural constraints:
  * <ul>
  *   <li>The {@code repository} package defines a persistence-independent interface.
+ *   <li>The {@code datamapper} package defines a technology-independent mapping module.
  *   <li>The {@code transport} package defines a broker-independent interface.
  *   <li>Strategy implementations implement their respective interfaces.
  *   <li>There are no cyclic dependencies between top-level packages.
@@ -38,6 +40,28 @@ class ArchitectureTest {
     static final ArchRule repository_should_not_depend_on_transport =
             noClasses().that().resideInAPackage("..repository..")
                     .should().dependOnClassesThat().resideInAPackage("..transport..");
+
+    // ── Data mapper independence ─────────────────────────────────────────────
+
+    @ArchTest
+    static final ArchRule datamapper_should_not_depend_on_jdbc =
+            noClasses().that().resideInAPackage("..datamapper..")
+                    .should().dependOnClassesThat().resideInAPackage("..jdbc..");
+
+    @ArchTest
+    static final ArchRule datamapper_should_not_depend_on_transport =
+            noClasses().that().resideInAPackage("..datamapper..")
+                    .should().dependOnClassesThat().resideInAPackage("..transport..");
+
+    @ArchTest
+    static final ArchRule datamapper_should_not_depend_on_polling =
+            noClasses().that().resideInAPackage("..datamapper..")
+                    .should().dependOnClassesThat().resideInAPackage("..polling..");
+
+    @ArchTest
+    static final ArchRule datamapper_should_not_depend_on_repository =
+            noClasses().that().resideInAPackage("..datamapper..")
+                    .should().dependOnClassesThat().resideInAPackage("..repository..");
 
     // ── Transport independence ───────────────────────────────────────────────
 
@@ -65,6 +89,14 @@ class ArchitectureTest {
             classes().that().resideInAPackage("..jdbc.rowmapper..")
                     .and().areNotInterfaces()
                     .should().implement(PayloadMapper.class);
+
+    @ArchTest
+    static final ArchRule data_mappers_implement_interface =
+            classes().that().resideInAPackage("..datamapper..")
+                    .and().areNotInterfaces()
+                    .and().areTopLevelClasses()
+                    .and().doNotHaveSimpleName("DataMapperUtil")
+                    .should().implement(OutboxDataMapper.class);
 
     @ArchTest
     static final ArchRule acknowledgement_handlers_implement_interface =
