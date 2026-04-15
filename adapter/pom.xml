@@ -7,7 +7,7 @@
     <parent>
         <groupId>de.knibel</groupId>
         <artifactId>sql-outbox-kafka-adapter-parent</artifactId>
-        <version>0.7.1-SNAPSHOT</version>
+        <version>0.7.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>sql-outbox-kafka-adapter</artifactId>
