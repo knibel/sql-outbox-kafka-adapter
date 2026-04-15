@@ -1,0 +1,78 @@
+# Default values for sql-outbox-kafka-adapter.
+
+replicaCount: 1
+
+image:
+  repository: knibel/sql-outbox-kafka-adapter
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created.
+  create: true
+  # Annotations to add to the service account.
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template.
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #     - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 512Mi
+  # requests:
+  #   cpu: 250m
+  #   memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# -- Application configuration injected via a ConfigMap and mounted as
+# application.yml inside the container.
+config:
+  spring:
+    datasource:
+      url: jdbc:postgresql://localhost:5432/mydb
+      username: myuser
+      password: mypassword
+  outbox:
+    kafka:
+      bootstrapServers: localhost:9092
+    tables:
+      - tableName: orders_outbox
+        staticTopic: orders
+        pollIntervalMs: 1000
+
+# -- Extra environment variables to set on the container (list of name/value
+# pairs or name/valueFrom entries).
+extraEnv: []
+  # - name: SPRING_DATASOURCE_PASSWORD
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: my-db-secret
+  #       key: password

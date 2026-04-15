@@ -1,0 +1,18 @@
+sql-outbox-kafka-adapter has been deployed.
+
+Get the application URL by running:
+{{- if eq .Values.service.type "NodePort" }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "sql-outbox-kafka-adapter.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if eq .Values.service.type "LoadBalancer" }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  kubectl get --namespace {{ .Release.Namespace }} svc {{ include "sql-outbox-kafka-adapter.fullname" . }} -w
+{{- else if eq .Values.service.type "ClusterIP" }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "sql-outbox-kafka-adapter.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  echo "Visit http://127.0.0.1:{{ .Values.service.port }}/actuator/health to check the service status"
+{{- end }}
+
+To install the chart from the OCI registry:
+
+  helm install my-release oci://ghcr.io/knibel/sql-outbox-kafka-adapter
