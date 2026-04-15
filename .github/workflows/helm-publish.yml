@@ -1,0 +1,56 @@
+name: Publish Helm chart
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - main
+    types:
+      - completed
+
+jobs:
+  helm:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: maven
+
+      - name: Extract Maven version
+        id: maven-version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl adapter)
+          VERSION=${VERSION%-SNAPSHOT}
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Chart.yaml versions
+        run: |
+          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.maven-version.outputs.version }}\"/" charts/sql-outbox-kafka-adapter/Chart.yaml
+
+      - name: Lint chart
+        run: helm lint charts/sql-outbox-kafka-adapter
+
+      - name: Package chart
+        run: helm package charts/sql-outbox-kafka-adapter -d .helm-packages
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push chart to GHCR
+        run: helm push .helm-packages/*.tgz oci://ghcr.io/${{ github.repository_owner }}

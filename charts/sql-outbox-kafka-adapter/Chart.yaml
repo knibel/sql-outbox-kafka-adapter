@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sql-outbox-kafka-adapter
+description: >-
+  A Spring Boot service that polls SQL outbox tables and publishes each row to
+  Apache Kafka with effectively-once semantics.
+type: application
+version: 0.1.0
+appVersion: "0.8.0"
+home: https://github.com/knibel/sql-outbox-kafka-adapter
+sources:
+  - https://github.com/knibel/sql-outbox-kafka-adapter
+keywords:
+  - outbox
+  - kafka
+  - sql
+  - cdc
+  - spring-boot
+maintainers:
+  - name: knibel
