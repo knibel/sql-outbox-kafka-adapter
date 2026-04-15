@@ -42,6 +42,67 @@ CREATE TABLE orders_outbox (
 
 ---
 
+## Deployment
+
+### Docker
+
+Pre-built images are published to Docker Hub after every successful CI run on
+`main`:
+
+```bash
+docker pull knibel/sql-outbox-kafka-adapter:latest
+```
+
+Mount your `application.yml` as a volume or pass configuration via environment
+variables (Spring Boot's relaxed binding maps `SPRING_DATASOURCE_URL` etc.):
+
+```bash
+docker run --rm \
+  -v $(pwd)/application.yml:/app/application.yml \
+  knibel/sql-outbox-kafka-adapter:latest
+```
+
+### Helm
+
+A Helm chart is published to GHCR as an OCI artifact:
+
+```bash
+helm install my-release oci://ghcr.io/knibel/sql-outbox-kafka-adapter \
+  --set config.spring.datasource.url=jdbc:postgresql://db:5432/mydb \
+  --set config.spring.datasource.username=myuser \
+  --set config.spring.datasource.password=mypassword \
+  --set config.outbox.kafka.bootstrapServers=kafka:9092
+```
+
+The chart mounts the full `config:` block from `values.yaml` as
+`application.yml` inside the container.  Use `extraEnv` to inject secrets from
+Kubernetes `Secret` objects:
+
+```yaml
+# values.yaml
+config:
+  spring:
+    datasource:
+      url: jdbc:postgresql://db:5432/mydb
+      username: myuser
+      password: mypassword
+  outbox:
+    kafka:
+      bootstrapServers: kafka:9092
+    tables:
+      - tableName: orders_outbox
+        staticTopic: orders
+
+extraEnv:
+  - name: SPRING_DATASOURCE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: my-db-secret
+        key: password
+```
+
+---
+
 ## Configuration reference
 
 All properties live under the `outbox` prefix.
@@ -65,6 +126,13 @@ Each entry in the `tables` list configures one outbox table.
 | `tableName` | _(required)_ | Name of the outbox table. |
 | `pollIntervalMs` | `1000` | How often to poll for new rows, in milliseconds. |
 | `batchSize` | `100` | Maximum number of rows processed per poll cycle. |
+| `skipDelayOnFullBatch` | `false` | When `true`, skips the polling delay and immediately starts the next cycle whenever the previous cycle returned a full batch. Allows draining a large backlog as fast as possible. |
+
+#### Custom SQL query
+
+| Property | Default | Description |
+|---|---|---|
+| `customQuery` | _(none)_ | Optional custom `SELECT` statement used to fetch pending rows. When set, it is executed as-is (no `FOR UPDATE SKIP LOCKED` or row-limiting is appended). The query must return all columns required by the configured mapping strategy. When absent, the adapter auto-generates the `SELECT`. |
 
 #### Column mapping
 
@@ -72,14 +140,14 @@ Each entry in the `tables` list configures one outbox table.
 |---|---|---|
 | `idColumn` | `id` | Primary-key column. Also used as the Kafka record key when `keyColumn` is not set. |
 | `keyColumn` | _(none)_ | Column whose value becomes the Kafka record key. Falls back to `idColumn` when absent. |
-| `payloadColumn` | `payload` | Column containing the Kafka record value (typically a JSON string). |
+| `payloadColumn` | `payload` | Column containing the Kafka record value (typically a JSON string). Used as-is when no `mappings` are configured. |
 | `headersColumn` | _(none)_ | Column containing a JSON object whose entries become Kafka record headers (e.g. `{"source":"orders-service"}`). Omit to send no headers. |
 | `topicColumn` | _(none)_ | Column used to determine the Kafka topic per row (enables per-row topic routing). When absent, `staticTopic` is used. |
 | `staticTopic` | _(none)_ | Kafka topic used for all rows when `topicColumn` is not set. |
 
-#### Row mapping
+#### Row mapping (`mappings`)
 
-Controls how SQL row columns are mapped to the Kafka record value (payload).
+Controls how SQL result-set columns are mapped to the Kafka record value (payload).
 
 By default (when no `mappings` list is configured), the adapter reads a
 pre-serialized JSON string from `payloadColumn`.  For customised mapping
@@ -90,37 +158,39 @@ Each mapping rule has the following properties:
 | Property | Required | Description |
 |---|---|---|
 | `source` | when `value` is absent | Source SQL column name, a regex wrapped in `/…/` (e.g. `/new_(.*)/`), or the wildcard `*`. Mutually exclusive with `value`. |
-| `value` | when `source` is absent | A static string value to inject. Mutually exclusive with `source`. |
-| `target` | **yes** | Target JSON field path (dot-separated for nesting). Special values: `_raw` (pass-through from column) and `_camelCase` (auto-convert all remaining columns). |
+| `value` | when `source` is absent | A static string value to inject into the JSON. Mutually exclusive with `source`. |
+| `target` | **yes** | Target JSON field path (dot-separated for nesting, e.g. `customer.address.city`). Special values: `_raw` (use column value as the entire payload) and `_camelCase` (auto-convert all remaining columns from `snake_case`). |
 | `dataType` | no | Target data type for conversion. One of: `STRING`, `INTEGER`, `LONG`, `DOUBLE`, `BOOLEAN`, `DECIMAL`, `DATE`, `DATETIME`. |
 | `format` | when `dataType` is `DATE` or `DATETIME` | A `DateTimeFormatter` pattern (e.g. `yyyy-MM-dd`, `yyyy-MM-dd'T'HH:mm:ss`). |
 | `valueMappings` | no | A map of raw database values (as strings) to replacement output values. Applied _before_ `dataType` conversion. |
-| `group` | no | Enables array-grouping for regex sources. See below. |
-
-##### Group properties (`group`)
-
-When present on a mapping rule with a regex `source`, columns matching the
-pattern are collected into a JSON array at the rule's `target` path.
-
-| Property | Required | Description |
-|---|---|---|
-| `by` | **yes** | Capture-group expression (e.g. `$1`) used to correlate columns into the same array element. |
-| `keyProperty` | no | Property name for injecting the captured group value into each array element. |
-| `property` | **yes** | Property name within each element where the column value is placed. |
+| `group` | no | Enables grouping for regex sources. Produces a JSON array (`LIST`, default) or JSON object (`MAP`). See [Group mapping](#group-mapping) below. |
 
 Rules are evaluated top-to-bottom.  Once a column is claimed by a rule, later
 rules skip it.
+
+#### Group mapping
+
+When a rule has a `group` configuration and a regex `source`, all matching
+columns are collected at the rule's `target` path.  The `group` block supports:
+
+| Property | Required | Description |
+|---|---|---|
+| `by` | **yes** | Capture-group expression (e.g. `$1`) that determines which columns belong to the same element or map key. |
+| `type` | no | Output structure: `LIST` (default – JSON array) or `MAP` (JSON object keyed by the captured group value). |
+| `keyProperty` | no | For `LIST` only: property name for injecting the captured group value into each array element (e.g. `"attribute"`). |
+| `property` | for `LIST` | For `LIST`: required – property name within each element where the column value is placed. For `MAP`: optional – when set, each key maps to an object with this property; when absent, each key maps directly to the column value. |
 
 #### Acknowledgement strategy
 
 After a row is successfully published, the adapter marks it as done according to
 the configured `acknowledgementStrategy`:
 
-| Strategy | Behaviour | Required columns |
+| Strategy | Behaviour | Required properties |
 |---|---|---|
 | `STATUS` _(default)_ | Updates `statusColumn` from `pendingValue` to `doneValue`. | `statusColumn`, `pendingValue`, `doneValue` |
 | `DELETE` | Deletes the row from the table. All rows present are treated as pending. | _(none)_ |
 | `TIMESTAMP` | Writes the current timestamp into `processedAtColumn`. Rows with `NULL` in that column are treated as pending. | `processedAtColumn` |
+| `CUSTOM` | Executes `customAcknowledgementQuery` with the row's `idColumn` value as the single bind parameter (`?`). | `customAcknowledgementQuery` |
 
 ##### STATUS strategy properties (defaults shown)
 
@@ -137,6 +207,23 @@ the configured `acknowledgementStrategy`:
 |---|---|---|
 | `acknowledgementStrategy` | _(set to `TIMESTAMP`)_ | Strategy to use. |
 | `processedAtColumn` | _(required)_ | Column into which `NOW()` is written after publishing. |
+
+##### CUSTOM strategy properties
+
+| Property | Default | Description |
+|---|---|---|
+| `acknowledgementStrategy` | _(set to `CUSTOM`)_ | Strategy to use. |
+| `customAcknowledgementQuery` | _(required)_ | SQL statement executed once per processed row. The row's `idColumn` value is passed as a single bind parameter (`?`). |
+
+#### Transient database error silencing
+
+These properties prevent log noise during planned database maintenance windows
+or brief connectivity interruptions:
+
+| Property | Default | Description |
+|---|---|---|
+| `transientDbErrorSilenceAfterIdleMs` | `0` | Minimum idle time in milliseconds (time since the last poll that returned rows) before transient DB errors are silently suppressed. `0` disables suppression entirely. |
+| `transientDbErrorSilenceDurationMs` | `0` | Duration in milliseconds for which transient DB errors are silently ignored once the idle threshold has been reached. After this window, errors are logged again. `0` disables suppression entirely. |
 
 ---
 
@@ -213,6 +300,29 @@ CREATE TABLE notifications_outbox (
 );
 ```
 
+### CUSTOM acknowledgement strategy
+
+Use a custom SQL statement when the standard strategies don't fit your schema –
+for example when the acknowledgement involves multiple columns or a stored
+procedure:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: outbox_events
+      idColumn: event_id
+      staticTopic: events
+      acknowledgementStrategy: CUSTOM
+      customAcknowledgementQuery: >
+        UPDATE outbox_events
+        SET fetched = true, fetched_at = NOW()
+        WHERE event_id = ?
+```
+
+The `?` placeholder receives the row's `idColumn` value.
+
 ### Per-row topic routing
 
 Set `topicColumn` to route each row to a different Kafka topic:
@@ -228,11 +338,35 @@ outbox:
 
 ```sql
 CREATE TABLE domain_events_outbox (
-    id           VARCHAR(36) PRIMARY KEY,
-    payload      TEXT        NOT NULL,
+    id           VARCHAR(36)  PRIMARY KEY,
+    payload      TEXT         NOT NULL,
     kafka_topic  VARCHAR(255) NOT NULL,
-    status       VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+    status       VARCHAR(16)  NOT NULL DEFAULT 'PENDING'
 );
+```
+
+### Custom SELECT query
+
+Use `customQuery` when you need a `JOIN`, `WHERE` clause, or any SQL that the
+adapter cannot auto-generate.  The query is executed as-is; you are responsible
+for selecting all columns needed by your mapping rules.
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      idColumn: id
+      staticTopic: orders
+      acknowledgementStrategy: DELETE
+      customQuery: >
+        SELECT o.* FROM orders_outbox o
+        JOIN batch_control b ON b.batch_id = o.batch_id
+        WHERE b.released = true
+      mappings:
+        - source: "*"
+          target: _camelCase
 ```
 
 ### Multiple tables
@@ -274,6 +408,41 @@ outbox:
   tables:
     - tableName: orders_outbox
       staticTopic: orders
+```
+
+### Skip delay on full batch
+
+When the adapter processes a full batch (equal to `batchSize`), it immediately
+starts the next poll cycle instead of waiting for `pollIntervalMs`.  This lets
+the poller drain a large backlog as fast as possible:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      batchSize: 200
+      pollIntervalMs: 500
+      skipDelayOnFullBatch: true
+```
+
+### Transient database error silencing
+
+Suppress log noise during planned maintenance windows.  After 5 minutes of
+inactivity (no rows returned), transient DB errors are silently ignored for up
+to 10 minutes:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      transientDbErrorSilenceAfterIdleMs: 300000   # 5 minutes idle
+      transientDbErrorSilenceDurationMs: 600000    # suppress for 10 minutes
 ```
 
 ### CamelCase row mapping
@@ -351,6 +520,34 @@ Produces:
 }
 ```
 
+### Static value injection
+
+Inject a constant string into every Kafka message, regardless of the row
+content.  Useful for adding an `eventType` discriminator or a fixed
+`companyId`:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: localhost:9092
+  tables:
+    - tableName: orders_outbox
+      staticTopic: orders
+      mappings:
+        - source: order_id
+          target: orderId
+        - value: "OrderCreated"
+          target: eventType
+        - value: "42"
+          target: companyId
+```
+
+Produces:
+
+```json
+{"orderId":"ORD-001","eventType":"OrderCreated","companyId":"42"}
+```
+
 ### Data type conversion
 
 Use `dataType` to convert column values to specific types in the JSON output:
@@ -372,6 +569,12 @@ outbox:
         - source: is_active
           target: active
           dataType: BOOLEAN
+        - source: item_count
+          target: itemCount
+          dataType: INTEGER
+        - source: price
+          target: price
+          dataType: DECIMAL
 ```
 
 ### Date/datetime formatting
@@ -558,3 +761,124 @@ A row with `action='U'`, `product_key='SKU-42'`, `new_price=29.99`,
 You can combine group rules with explicit and regex rules.  Rules are
 evaluated top-to-bottom; a column already handled by an earlier rule is
 excluded from later rules.
+
+### Group mapping (paired columns → JSON object / MAP type)
+
+Use `group.type: MAP` to produce a JSON object instead of an array.  Each
+unique captured-group value becomes a key in the object.
+
+Without `property`, each key maps directly to the column value:
+
+```yaml
+mappings:
+  - source: /attr_(.*)/
+    target: attributes
+    group:
+      by: $1
+      type: MAP
+```
+
+A row with `attr_color=red` and `attr_size=L` produces:
+
+```json
+{"attributes": {"color": "red", "size": "L"}}
+```
+
+With `property`, each key maps to a nested object:
+
+```yaml
+mappings:
+  - source: /new_(.*)/
+    target: modifications
+    group:
+      by: $1
+      type: MAP
+      property: after
+  - source: /old_(.*)/
+    target: modifications
+    group:
+      by: $1
+      type: MAP
+      property: before
+```
+
+A row with `new_price=29.99`, `old_price=24.99`, `new_stock=150`, `old_stock=100`
+produces:
+
+```json
+{
+  "modifications": {
+    "price": {"after": 29.99, "before": 24.99},
+    "stock": {"after": 150,   "before": 100}
+  }
+}
+```
+
+### Cross-join / multi-table pattern (Oracle example)
+
+Use `customQuery` together with `acknowledgementStrategy: CUSTOM` to handle
+advanced scenarios where rows from one table only become visible once a
+condition in another table is met:
+
+```yaml
+outbox:
+  kafka:
+    bootstrapServers: kafka-broker:9092
+  tables:
+    # Table 1: publish individual data rows only when a matching batch exists
+    - tableName: DATA_RECORDS
+      idColumn: LOAD_ID
+      keyColumn: ENTITY_ID
+      staticTopic: data-request
+      pollIntervalMs: 500
+      batchSize: 100
+      skipDelayOnFullBatch: true
+      customQuery: >
+        SELECT * FROM DATA_RECORDS t1
+        WHERE EXISTS (
+          SELECT 1 FROM BATCH_STATUS t2
+          WHERE t2.REFERENCE_DATE = t1.REFERENCE_DATE
+          AND   t2.BATCH_ID       = t1.BATCH_REF_ID
+        )
+      acknowledgementStrategy: CUSTOM
+      customAcknowledgementQuery: >
+        DELETE FROM DATA_RECORDS WHERE LOAD_ID = ?
+      mappings:
+        - source: ENTITY_ID
+          target: eventData.entityId
+          dataType: LONG
+        - source: AMOUNT
+          target: eventData.items.amount
+          dataType: DECIMAL
+        - value: "DataRequest.ItemsRequested"
+          target: eventType
+
+    # Table 2: publish a batch-complete event once all DATA_RECORDS are gone
+    - tableName: BATCH_STATUS
+      idColumn: BATCH_ID
+      keyColumn: BATCH_ID
+      staticTopic: batch-status
+      pollIntervalMs: 500
+      customQuery: >
+        SELECT * FROM BATCH_STATUS t1
+        WHERE t1.FETCHED_FLAG = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM DATA_RECORDS t2
+          WHERE t2.REFERENCE_DATE = t1.REFERENCE_DATE
+          AND   t2.BATCH_REF_ID   = t1.BATCH_ID
+        )
+      acknowledgementStrategy: CUSTOM
+      customAcknowledgementQuery: >
+        UPDATE BATCH_STATUS
+        SET FETCHED_FLAG = 1, FETCHED_AT = CURRENT_TIMESTAMP
+        WHERE BATCH_ID = ?
+      mappings:
+        - source: RECORD_COUNT
+          target: eventData.recordCount
+          dataType: LONG
+        - source: BATCH_ID
+          target: eventData.batchId
+          dataType: LONG
+        - value: "BatchStatus.BatchInfoProvided"
+          target: eventType
+```
