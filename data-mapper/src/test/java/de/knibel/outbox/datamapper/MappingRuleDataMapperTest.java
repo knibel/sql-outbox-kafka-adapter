@@ -3,6 +3,7 @@ package de.knibel.outbox.datamapper;
 import de.knibel.outbox.config.DataMapperConfig;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.GroupConfig;
+import de.knibel.outbox.config.GroupType;
 import de.knibel.outbox.config.MappingRule;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -239,6 +240,116 @@ class MappingRuleDataMapperTest {
         assertThat(changes.get(0).get("field")).isEqualTo("price");
     }
 
+    // ── Map grouping ───────────────────────────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapGroupRule_groupsColumnsIntoMap_directValue() {
+        Map<String, Object> row = rowOf("new_price", 10.0, "new_stock", 100);
+
+        MappingRule mapRule = mapGroupRule("/new_(.*)/", "changes", "$1", null);
+        DataMapperConfig config = configWith(mapRule);
+
+        Map<String, Object> result = mapper.map(row, config);
+
+        Map<String, Object> changes = (Map<String, Object>) result.get("changes");
+        assertThat(changes).containsEntry("price", 10.0)
+                            .containsEntry("stock", 100);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapGroupRule_groupsColumnsIntoMap_withProperty() {
+        Map<String, Object> row = rowOf(
+                "new_price", 10.0, "old_price", 8.0,
+                "new_stock", 100, "old_stock", 50);
+
+        MappingRule newRule = mapGroupRule("/new_(.*)/", "modifications", "$1", "after");
+        MappingRule oldRule = mapGroupRule("/old_(.*)/", "modifications", "$1", "before");
+        DataMapperConfig config = configWith(newRule, oldRule);
+
+        Map<String, Object> result = mapper.map(row, config);
+
+        Map<String, Object> modifications = (Map<String, Object>) result.get("modifications");
+        assertThat(modifications).hasSize(2);
+
+        Map<String, Object> price = (Map<String, Object>) modifications.get("price");
+        assertThat(price).containsEntry("after", 10.0)
+                          .containsEntry("before", 8.0);
+
+        Map<String, Object> stock = (Map<String, Object>) modifications.get("stock");
+        assertThat(stock).containsEntry("after", 100)
+                          .containsEntry("before", 50);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapGroupRule_explicitMappingTakesPrecedence() {
+        Map<String, Object> row = rowOf(
+                "new_price", 10.0, "new_name", "the_name");
+
+        MappingRule explicit = rule("new_name", "productName");
+        MappingRule mapRule = mapGroupRule("/new_(.*)/", "changes", "$1", null);
+        DataMapperConfig config = configWith(explicit, mapRule);
+
+        Map<String, Object> result = mapper.map(row, config);
+
+        assertThat(result.get("productName")).isEqualTo("the_name");
+
+        Map<String, Object> changes = (Map<String, Object>) result.get("changes");
+        assertThat(changes).hasSize(1)
+                            .containsEntry("price", 10.0);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapGroupRule_withDataTypeConversion() {
+        Map<String, Object> row = rowOf("new_amount", new BigDecimal("99.95"));
+
+        MappingRule mapRule = mapGroupRule("/new_(.*)/", "changes", "$1", null);
+        mapRule.setDataType(FieldDataType.DOUBLE);
+        DataMapperConfig config = configWith(mapRule);
+
+        Map<String, Object> result = mapper.map(row, config);
+
+        Map<String, Object> changes = (Map<String, Object>) result.get("changes");
+        assertThat(changes).containsEntry("amount", 99.95);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapGroupRule_nestedTargetPath() {
+        Map<String, Object> row = rowOf("new_price", 10.0, "new_stock", 100);
+
+        MappingRule mapRule = mapGroupRule("/new_(.*)/", "order.changes", "$1", null);
+        DataMapperConfig config = configWith(mapRule);
+
+        Map<String, Object> result = mapper.map(row, config);
+
+        Map<String, Object> order = (Map<String, Object>) result.get("order");
+        Map<String, Object> changes = (Map<String, Object>) order.get("changes");
+        assertThat(changes).containsEntry("price", 10.0)
+                            .containsEntry("stock", 100);
+    }
+
+    // ── Existing list grouping unaffected (backward compatibility) ───
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void groupRuleWithoutType_defaultsToList() {
+        Map<String, Object> row = rowOf("new_price", 10.0, "new_stock", 100);
+
+        MappingRule groupRuleNoType = groupRule("/new_(.*)/", "changes", "$1", "attr", "value");
+        DataMapperConfig config = configWith(groupRuleNoType);
+
+        Map<String, Object> result = mapper.map(row, config);
+
+        // Default is LIST, not MAP
+        assertThat(result.get("changes")).isInstanceOf(List.class);
+        List<Map<String, Object>> changes = (List<Map<String, Object>>) result.get("changes");
+        assertThat(changes).hasSize(2);
+    }
+
     // ── Composable rules ────────────────────────────────────────────────
 
     @Test
@@ -310,6 +421,19 @@ class MappingRuleDataMapperTest {
         GroupConfig group = new GroupConfig();
         group.setBy(by);
         group.setKeyProperty(keyProperty);
+        group.setProperty(property);
+        rule.setGroup(group);
+        return rule;
+    }
+
+    private static MappingRule mapGroupRule(String source, String target,
+                                            String by, String property) {
+        MappingRule rule = new MappingRule();
+        rule.setSource(source);
+        rule.setTarget(target);
+        GroupConfig group = new GroupConfig();
+        group.setBy(by);
+        group.setType(GroupType.MAP);
         group.setProperty(property);
         rule.setGroup(group);
         return rule;

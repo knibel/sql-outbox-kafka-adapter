@@ -1,6 +1,7 @@
 package de.knibel.outbox.datamapper;
 
 import de.knibel.outbox.config.DataMapperConfig;
+import de.knibel.outbox.config.GroupType;
 import de.knibel.outbox.config.MappingRule;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -51,6 +52,8 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
         Map<String, Map<String, Map<String, Object>>> groupState = new LinkedHashMap<>();
         // Track keyProperty and group configs per target path
         Map<String, String> groupKeyProperties = new LinkedHashMap<>();
+        // Track group type per target path (first rule wins)
+        Map<String, GroupType> groupTypes = new LinkedHashMap<>();
 
         for (int ruleIndex = 0; ruleIndex < rules.size(); ruleIndex++) {
             MappingRule rule = rules.get(ruleIndex);
@@ -78,7 +81,7 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
 
                 if (rule.isGroupRule()) {
                     processGroupRule(row, rule, pattern,
-                            handledColumns, groupState, groupKeyProperties);
+                            handledColumns, groupState, groupKeyProperties, groupTypes);
                 } else {
                     processRegexRule(row, rule, pattern, handledColumns, root);
                 }
@@ -95,23 +98,17 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
             }
         }
 
-        // Finalize all group rules: convert grouped entries to JSON arrays
+        // Finalize all group rules: convert grouped entries to the target structure
         for (Map.Entry<String, Map<String, Map<String, Object>>> groupEntry : groupState.entrySet()) {
             String targetPath = groupEntry.getKey();
             Map<String, Map<String, Object>> groups = groupEntry.getValue();
             String keyProperty = groupKeyProperties.get(targetPath);
+            GroupType groupType = groupTypes.getOrDefault(targetPath, GroupType.LIST);
 
-            List<Map<String, Object>> list = new ArrayList<>();
-            for (Map.Entry<String, Map<String, Object>> entry : groups.entrySet()) {
-                Map<String, Object> element = new LinkedHashMap<>();
-                if (keyProperty != null && !keyProperty.isBlank()) {
-                    element.put(keyProperty, entry.getKey());
-                }
-                element.putAll(entry.getValue());
-                list.add(element);
-            }
-            if (!list.isEmpty()) {
-                DataMapperUtil.setNestedValue(root, targetPath, list);
+            if (groupType == GroupType.MAP) {
+                finalizeMapGroup(root, targetPath, groups);
+            } else {
+                finalizeListGroup(root, targetPath, groups, keyProperty);
             }
         }
 
@@ -140,19 +137,26 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
         }
     }
 
-    // ── Array grouping ───────────────────────────────────────────────────────
+    // ── Group collection ────────────────────────────────────────────────────
+
+    /** Sentinel property key used when no {@code property} is configured. */
+    private static final String DIRECT_VALUE = "\0__direct__";
 
     private void processGroupRule(Map<String, Object> row,
                                   MappingRule rule, Pattern pattern,
                                   Set<String> handledColumns,
                                   Map<String, Map<String, Map<String, Object>>> groupState,
-                                  Map<String, String> groupKeyProperties) {
+                                  Map<String, String> groupKeyProperties,
+                                  Map<String, GroupType> groupTypes) {
         String targetPath = rule.getTarget();
         Map<String, Map<String, Object>> groups =
                 groupState.computeIfAbsent(targetPath, _ -> new LinkedHashMap<>());
 
-        // Record keyProperty – first rule wins if multiple rules target same path
+        // Record keyProperty and type – first rule wins if multiple rules target same path
         groupKeyProperties.putIfAbsent(targetPath, rule.getGroup().getKeyProperty());
+        groupTypes.putIfAbsent(targetPath, rule.getGroup().getEffectiveType());
+
+        String propertyName = rule.getGroup().getProperty();
 
         for (Map.Entry<String, Object> entry : row.entrySet()) {
             String columnName = entry.getKey();
@@ -165,10 +169,58 @@ public class MappingRuleDataMapper implements OutboxDataMapper {
                 Object value = entry.getValue();
                 Object mapped = DataMapperUtil.applyValueMapping(value, rule.getValueMappings());
                 Object converted = DataMapperUtil.convertValue(mapped, rule.getDataType(), rule.getFormat());
+                String key = (propertyName != null) ? propertyName : DIRECT_VALUE;
                 groups.computeIfAbsent(capturedKey, _ -> new LinkedHashMap<>())
-                      .put(rule.getGroup().getProperty(), converted);
+                      .put(key, converted);
                 handledColumns.add(columnName.toLowerCase(Locale.ROOT));
             }
+        }
+    }
+
+    // ── Group finalization ────────────────────────────────────────────────────
+
+    /**
+     * Finalize a LIST group: convert grouped entries to a JSON array.
+     */
+    private static void finalizeListGroup(Map<String, Object> root, String targetPath,
+                                          Map<String, Map<String, Object>> groups,
+                                          String keyProperty) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Object>> entry : groups.entrySet()) {
+            Map<String, Object> element = new LinkedHashMap<>();
+            if (keyProperty != null && !keyProperty.isBlank()) {
+                element.put(keyProperty, entry.getKey());
+            }
+            element.putAll(entry.getValue());
+            list.add(element);
+        }
+        if (!list.isEmpty()) {
+            DataMapperUtil.setNestedValue(root, targetPath, list);
+        }
+    }
+
+    /**
+     * Finalize a MAP group: convert grouped entries to a JSON object/map.
+     *
+     * <p>When the inner map contains only the {@link #DIRECT_VALUE} sentinel,
+     * each key maps directly to the column value.  Otherwise each key maps
+     * to a nested object of properties.
+     */
+    private static void finalizeMapGroup(Map<String, Object> root, String targetPath,
+                                         Map<String, Map<String, Object>> groups) {
+        Map<String, Object> mapResult = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Object>> entry : groups.entrySet()) {
+            Map<String, Object> props = entry.getValue();
+            if (props.size() == 1 && props.containsKey(DIRECT_VALUE)) {
+                // No property configured – flatten to direct value
+                mapResult.put(entry.getKey(), props.get(DIRECT_VALUE));
+            } else {
+                // With property name(s) – keep as nested object
+                mapResult.put(entry.getKey(), new LinkedHashMap<>(props));
+            }
+        }
+        if (!mapResult.isEmpty()) {
+            DataMapperUtil.setNestedValue(root, targetPath, mapResult);
         }
     }
 
