@@ -31,7 +31,7 @@ jobs:
       - name: Extract Maven version
         id: maven-version
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -pl adapter)
           VERSION=${VERSION%-SNAPSHOT}
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
