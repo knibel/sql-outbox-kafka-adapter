@@ -4,7 +4,6 @@ import de.knibel.outbox.config.DataMapperConfig;
 import de.knibel.outbox.config.FieldDataType;
 import de.knibel.outbox.config.GroupConfig;
 import de.knibel.outbox.config.MappingRule;
-import de.knibel.outbox.config.OutboxTableProperties;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -317,14 +316,11 @@ class MappingRuleDataMapperTest {
     }
 
     private static DataMapperConfig configWith(MappingRule... rules) {
-        OutboxTableProperties config = new OutboxTableProperties();
-        config.setTableName("test_table");
         List<MappingRule> list = new ArrayList<>();
         for (MappingRule r : rules) {
             list.add(r);
         }
-        config.setMappings(list);
-        return config;
+        return () -> list;
     }
 
     /**
