@@ -13,7 +13,7 @@
 
     <groupId>de.knibel</groupId>
     <artifactId>sql-outbox-kafka-adapter-parent</artifactId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>0.7.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>sql-outbox-kafka-adapter-parent</name>
     <description>Parent POM for the SQL Outbox Kafka Adapter multi-module project</description>
@@ -26,7 +26,7 @@
     <properties>
         <java.version>25</java.version>
         <!-- Keep dependency versions explicit so CVE audits are easy -->
-        <kafka-clients.version>3.9.0</kafka-clients.version>
+        <kafka-clients.version>3.9.2</kafka-clients.version>
         <postgresql.version>42.7.7</postgresql.version>
         <ojdbc11.version>23.7.0.25.01</ojdbc11.version>
         <testcontainers.version>1.20.6</testcontainers.version>
