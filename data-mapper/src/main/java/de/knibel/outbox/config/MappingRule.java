@@ -15,7 +15,8 @@ import java.util.Map;
  *   <tr><th>source</th><th>target</th><th>Behaviour</th></tr>
  *   <tr><td>literal column name</td><td>JSON path</td><td>Explicit column→field mapping</td></tr>
  *   <tr><td>{@code /regex/}</td><td>JSON path with back-refs</td><td>Regex pattern mapping</td></tr>
- *   <tr><td>{@code /regex/}</td><td>JSON path</td><td>Array grouping when {@code group} is set</td></tr>
+ *   <tr><td>{@code /regex/}</td><td>JSON path</td><td>Array grouping when {@code group} is set (default)</td></tr>
+ *   <tr><td>{@code /regex/}</td><td>JSON path</td><td>Map grouping when {@code group.type} is {@code MAP}</td></tr>
  *   <tr><td>{@code *}</td><td>{@code _camelCase}</td><td>Auto-discover all remaining columns, snake→camel (replaces {@code TO_CAMEL_CASE})</td></tr>
  *   <tr><td>literal column name</td><td>{@code _raw}</td><td>Use column value verbatim as entire payload (replaces {@code PAYLOAD_COLUMN})</td></tr>
  *   <tr><td><em>absent</em></td><td>JSON path</td><td>Static constant injection</td></tr>
@@ -108,9 +109,10 @@ public class MappingRule {
     private Map<String, String> valueMappings = new LinkedHashMap<>();
 
     /**
-     * Optional group configuration for array aggregation.  When present,
-     * the rule collects matching columns into a JSON array at the
-     * {@code target} path.  Requires a regex {@code source}.
+     * Optional group configuration for aggregation.  When present,
+     * the rule collects matching columns at the {@code target} path.
+     * The output structure (array or map) is controlled by
+     * {@link GroupConfig#getType()}.  Requires a regex {@code source}.
      */
     private GroupConfig group;
 
