@@ -5,7 +5,7 @@ description: >-
   Apache Kafka with effectively-once semantics.
 type: application
 version: 0.1.0
-appVersion: "0.7.1"
+appVersion: "0.8.0"
 home: https://github.com/knibel/sql-outbox-kafka-adapter
 sources:
   - https://github.com/knibel/sql-outbox-kafka-adapter
