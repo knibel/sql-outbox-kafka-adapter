@@ -24,12 +24,32 @@ spring:
       # Maximum lifetime of a connection in the pool (ms).
       max-lifetime: 1800000
 
+# ── Embedded Tomcat ───────────────────────────────────────────────────────────
+# This application serves no user traffic – only actuator health/metrics probes.
+# Tune Tomcat down to a minimal footprint.
+server:
+  tomcat:
+    threads:
+      # Default is 200; a handful is plenty for actuator-only traffic.
+      max: 4
+      min-spare: 2
+    # Default is 8192; keep a small number of open connections.
+    max-connections: 20
+    # Default is 100; tiny backlog matches the low connection count.
+    accept-count: 5
+
 # ── Actuator ──────────────────────────────────────────────────────────────────
 management:
   endpoints:
     web:
       exposure:
         include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      # Expose /actuator/health/liveness and /actuator/health/readiness
+      # for Kubernetes liveness / readiness probes.
+      probes:
+        enabled: true
   metrics:
     export:
       prometheus:

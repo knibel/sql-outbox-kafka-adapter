@@ -13,7 +13,7 @@
 
     <groupId>de.knibel</groupId>
     <artifactId>sql-outbox-kafka-adapter-parent</artifactId>
-    <version>0.7.1-SNAPSHOT</version>
+    <version>0.7.2-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>sql-outbox-kafka-adapter-parent</name>
     <description>Parent POM for the SQL Outbox Kafka Adapter multi-module project</description>
